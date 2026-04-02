@@ -22,7 +22,7 @@ interface MainCanvasProps {
 const MainCanvas: React.FC<MainCanvasProps> = (props) => {
   return (
     <div className="flex flex-col flex-1 min-w-0 bg-[#0f172a]">
-      <div className="flex-1 relative p-3 min-h-0">
+      <div className="flex-1 relative p-3" style={{ minHeight: 0, height: '100%' }}>
         <AnimatePresence mode="wait">
           <motion.div
             key={`${props.cancerType}-${props.geneA}-${props.geneB}`}
@@ -30,8 +30,8 @@ const MainCanvas: React.FC<MainCanvasProps> = (props) => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="w-full h-full rounded-xl border border-gray-800 overflow-hidden"
-            style={{ background: '#111827', minHeight: 400 }}
+            className="w-full rounded-xl border border-gray-800 overflow-hidden"
+            style={{ background: '#111827', height: '100%', minHeight: 460 }}
           >
             <CorrelationPlot
               samples={props.samples}
