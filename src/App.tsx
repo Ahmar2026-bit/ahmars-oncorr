@@ -4,11 +4,13 @@ import Header from './components/Header';
 import LeftSidebar from './components/LeftSidebar';
 import MainCanvas from './components/MainCanvas';
 import StatsPanel from './components/StatsPanel';
+import ResearchTabs from './components/ResearchTabs';
 import { useCorrelationData } from './hooks/useCorrelationData';
 import { useFilters } from './hooks/useFilters';
 import { useSelection } from './hooks/useSelection';
 import { filterSamples } from './utils/filtering';
 import { calculateCorrelationResult } from './utils/statistics';
+import type { NotebookEntry } from './types/notebook';
 
 const DEFAULT_GENE_A = 'GATA6';
 const DEFAULT_GENE_B = 'HSF1';
@@ -47,12 +49,31 @@ function App() {
     clearSelection();
   }, [resetFilters, clearSelection]);
 
+  // Research Notebook state
+  const [notebookEntries, setNotebookEntries] = useState<NotebookEntry[]>([]);
+
+  const handlePin = useCallback((entry: Omit<NotebookEntry, 'id'>) => {
+    setNotebookEntries(prev => [
+      { ...entry, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` },
+      ...prev,
+    ]);
+  }, []);
+
+  const handleRemoveEntry = useCallback((id: string) => {
+    setNotebookEntries(prev => prev.filter(e => e.id !== id));
+  }, []);
+
+  const handleClearNotebook = useCallback(() => {
+    setNotebookEntries([]);
+  }, []);
+
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ background: '#0f172a' }}>
+    <div className="flex flex-col min-h-screen overflow-y-auto" style={{ background: '#0f172a' }}>
       <Header geneA={geneA} geneB={geneB} cancerType={cancerType} />
 
       <motion.div
-        className="flex flex-1 min-h-0"
+        className="flex"
+        style={{ height: '60vh', minHeight: 480 }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3 }}
@@ -90,6 +111,17 @@ function App() {
           geneB={geneB}
         />
       </motion.div>
+
+      <ResearchTabs
+        geneA={geneA}
+        geneB={geneB}
+        cancerType={cancerType}
+        result={filteredResult}
+        notebookEntries={notebookEntries}
+        onPin={handlePin}
+        onRemoveEntry={handleRemoveEntry}
+        onClearNotebook={handleClearNotebook}
+      />
     </div>
   );
 }
