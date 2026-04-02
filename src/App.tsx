@@ -20,7 +20,7 @@ function App() {
   const [cancerType, setCancerType] = useState(DEFAULT_CANCER_TYPE);
 
   const { filters, setFilter, resetFilters } = useFilters();
-  const { selectedSamples, hoveredSample: _hoveredSample, setHoveredSample, clearSelection } = useSelection();
+  const { selectedSamples, setHoveredSample, clearSelection } = useSelection();
 
   const { samples: rawSamples, result: rawResult, isLoading } = useCorrelationData(cancerType, geneA, geneB);
 
