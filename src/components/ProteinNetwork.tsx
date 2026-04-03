@@ -89,7 +89,7 @@ export default function ProteinNetwork({
           {loading ? 'Loading…' : 'Get Interactions'}
         </button>
         <a
-          href={`https://string-db.org/network/${gene || 'TP53'}`}
+          href={`https://string-db.org/network/${encodeURIComponent((gene || 'TP53').replace(/[^A-Za-z0-9_\-]/g, ''))}`}
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-1 text-xs text-brand-500 hover:underline ml-auto"
