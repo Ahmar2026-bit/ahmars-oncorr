@@ -3,8 +3,10 @@ import Header from './components/Header';
 import GeneCorrelation from './components/GeneCorrelation';
 import AIChat from './components/AIChat';
 import LiteratureSearch from './components/LiteratureSearch';
+import GEOSearch from './components/GEOSearch';
+import ProteinNetwork from './components/ProteinNetwork';
 
-type Tab = 'correlation' | 'ai' | 'literature';
+type Tab = 'correlation' | 'ai' | 'literature' | 'geo' | 'network';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('correlation');
@@ -12,9 +14,11 @@ export default function App() {
   const [geneB, setGeneB] = useState('');
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'correlation', label: '📈 Gene Correlation' },
-    { id: 'ai', label: '🤖 AI Analysis' },
-    { id: 'literature', label: '📚 Literature' },
+    { id: 'correlation', label: '📈 Correlation' },
+    { id: 'ai',          label: '🤖 AI Analysis' },
+    { id: 'literature',  label: '📚 PubMed' },
+    { id: 'geo',         label: '🧬 GEO Datasets' },
+    { id: 'network',     label: '🔗 Protein Network' },
   ];
 
   return (
@@ -23,12 +27,12 @@ export default function App() {
 
       <main className="flex-1 max-w-5xl mx-auto w-full p-4 flex flex-col gap-4">
         {/* Tab bar */}
-        <div className="flex gap-1 bg-white rounded-xl border border-gray-200 p-1 w-fit">
+        <div className="flex gap-1 bg-white rounded-xl border border-gray-200 p-1 flex-wrap">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === t.id
                   ? 'bg-brand-600 text-white shadow-sm'
                   : 'text-gray-600 hover:bg-gray-100'
@@ -45,22 +49,38 @@ export default function App() {
             <GeneCorrelation
               geneA={geneA}
               geneB={geneB}
-              onGenesChange={(a, b) => {
-                setGeneA(a);
-                setGeneB(b);
-              }}
+              onGenesChange={(a, b) => { setGeneA(a); setGeneB(b); }}
             />
           )}
           {activeTab === 'ai' && <AIChat geneA={geneA} geneB={geneB} />}
           {activeTab === 'literature' && (
             <LiteratureSearch initialQuery={geneA && geneB ? `${geneA} ${geneB}` : ''} />
           )}
+          {activeTab === 'geo' && (
+            <GEOSearch initialQuery={geneA && geneB ? `${geneA} ${geneB} cancer` : ''} />
+          )}
+          {activeTab === 'network' && (
+            <ProteinNetwork geneA={geneA} geneB={geneB} />
+          )}
         </div>
 
         {/* Quick start hints */}
         {!geneA && !geneB && (
-          <div className="text-center text-xs text-gray-400 mt-2 space-y-1">
-            <p>Try: <strong>TP53</strong> vs <strong>BRCA1</strong> · <strong>EGFR</strong> vs <strong>KRAS</strong> · <strong>MYC</strong> vs <strong>BCL2</strong></p>
+          <div className="text-center text-xs text-gray-400 mt-1">
+            <p>
+              Try:{' '}
+              {[['TP53', 'BRCA1'], ['EGFR', 'KRAS'], ['MYC', 'BCL2']].map(([a, b], i) => (
+                <span key={i}>
+                  {i > 0 && ' · '}
+                  <button
+                    className="font-semibold hover:text-brand-500 transition-colors"
+                    onClick={() => { setGeneA(a); setGeneB(b); }}
+                  >
+                    {a} vs {b}
+                  </button>
+                </span>
+              ))}
+            </p>
           </div>
         )}
       </main>

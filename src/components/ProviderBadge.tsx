@@ -6,10 +6,20 @@ const PROVIDER_META: Record<AIProvider, { label: string; color: string; dot: str
     color: 'bg-orange-100 text-orange-800 border-orange-200',
     dot: 'bg-orange-500',
   },
+  deepseek: {
+    label: 'DeepSeek-V3',
+    color: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    dot: 'bg-indigo-500',
+  },
   gemini: {
     label: 'Gemini 1.5 Flash',
     color: 'bg-blue-100 text-blue-800 border-blue-200',
     dot: 'bg-blue-500',
+  },
+  openrouter: {
+    label: 'OpenRouter · Free',
+    color: 'bg-purple-100 text-purple-800 border-purple-200',
+    dot: 'bg-purple-500',
   },
   ollama: {
     label: 'Ollama · Local',
