@@ -1,0 +1,72 @@
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #0f1117;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.oncorr-app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 1rem;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.oncorr-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.oncorr-header h1 {
+  font-size: 2.8rem;
+  color: #7ee8a2;
+  margin: 0 0 0.5rem;
+}
+
+.oncorr-tagline {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+}
+
+.oncorr-main {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.oncorr-card {
+  background: #1c1f2e;
+  border: 1px solid #2e3349;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.oncorr-card h2 {
+  font-size: 1.2rem;
+  color: #7ee8a2;
+  margin: 0 0 0.75rem;
+}
+
+.oncorr-card p {
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.oncorr-footer {
+  margin-top: 3rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.85rem;
+}
