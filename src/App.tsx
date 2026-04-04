@@ -25,7 +25,8 @@ interface HistoryEntry {
 function loadHistory(): HistoryEntry[] {
   try {
     return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]') as HistoryEntry[];
-  } catch {
+  } catch (error) {
+    console.error('Failed to load search history:', error);
     return [];
   }
 }

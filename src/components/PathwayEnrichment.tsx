@@ -62,7 +62,11 @@ export default function PathwayEnrichment({
 
   const chartData = results
     .slice(0, 10)
-    .map((r) => ({ name: r.pathway.replace(/ - Homo sapiens \(human\)$/, ''), score: +r.combinedScore.toFixed(1), adj: +r.adjustedPValue.toExponential(2) }))
+    .map((r) => ({
+      name: r.pathway.replace(/ - Homo sapiens \(human\)$/, ''),
+      score: +r.combinedScore.toFixed(1),
+      adj: +r.adjustedPValue.toExponential(2),
+    }))
     .sort((a, b) => b.score - a.score);
 
   return (
