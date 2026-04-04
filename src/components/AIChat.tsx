@@ -47,6 +47,31 @@ export default function AIChat({ geneA, geneB }: { geneA: string; geneB: string 
     }
   }, [geneA, geneB]);
 
+  const quickPrompts: { label: string; prompt: string }[] = geneA
+    ? [
+        {
+          label: '🔬 Clinical significance',
+          prompt: `What is the clinical significance of ${geneA}${geneB ? ` and ${geneB}` : ''} in cancer?`,
+        },
+        {
+          label: '💊 Find inhibitors',
+          prompt: `What are the key inhibitors or targeted therapies for ${geneA}${geneB ? ` and ${geneB}` : ''}?`,
+        },
+        {
+          label: '🧪 Suggest experiments',
+          prompt: `Suggest experimental approaches to study the role of ${geneA}${geneB ? ` and ${geneB}` : ''} in oncogenesis.`,
+        },
+        {
+          label: '🛤️ Pathways',
+          prompt: `What signalling pathways involve ${geneA}${geneB ? ` and ${geneB}` : ''} in cancer?`,
+        },
+        {
+          label: '📊 Biomarker potential',
+          prompt: `Assess the biomarker potential of ${geneA}${geneB ? ` and ${geneB}` : ''} for cancer diagnosis or prognosis.`,
+        },
+      ]
+    : [];
+
   async function send() {
     const text = input.trim();
     if (!text || loading) return;
@@ -140,23 +165,39 @@ export default function AIChat({ geneA, geneB }: { geneA: string; geneB: string 
       </div>
 
       {/* Input */}
-      <div className="mt-4 flex gap-2 items-end">
-        <textarea
-          className="flex-1 resize-none border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-          rows={2}
-          placeholder="Ask about genes, pathways, biomarkers… (Enter to send)"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKey}
-          disabled={loading}
-        />
-        <button
-          onClick={send}
-          disabled={loading || !input.trim()}
-          className="p-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 text-white rounded-xl transition-colors"
-        >
-          <Send size={16} />
-        </button>
+      <div className="mt-4 space-y-2">
+        {/* Quick prompt buttons */}
+        {quickPrompts.length > 0 && messages.length === 0 && (
+          <div className="flex gap-1.5 flex-wrap">
+            {quickPrompts.map((q) => (
+              <button
+                key={q.label}
+                onClick={() => { setInput(q.prompt); }}
+                className="text-xs px-2 py-1 border border-brand-200 text-brand-600 hover:bg-brand-50 rounded-full transition-colors"
+              >
+                {q.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2 items-end">
+          <textarea
+            className="flex-1 resize-none border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+            rows={2}
+            placeholder="Ask about genes, pathways, biomarkers… (Enter to send)"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            disabled={loading}
+          />
+          <button
+            onClick={send}
+            disabled={loading || !input.trim()}
+            className="p-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 text-white rounded-xl transition-colors"
+          >
+            <Send size={16} />
+          </button>
+        </div>
       </div>
     </div>
   );
