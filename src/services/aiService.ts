@@ -9,7 +9,7 @@
  */
 
 import Groq from 'groq-sdk';
-import { getApiKey } from './settingsService';
+import { getApiKey, getSelectedProvider } from './settingsService';
 
 export type AIProvider = 'groq' | 'deepseek' | 'gemini' | 'openrouter' | 'ollama' | 'demo';
 
@@ -182,30 +182,72 @@ async function queryOllama(prompt: string): Promise<string> {
 
 export async function askAI(prompt: string): Promise<AIResponse> {
   const env = import.meta.env;
-  if (getApiKey('groq') || env.VITE_GROQ_API_KEY) {
-    try { return { text: await queryGroq(prompt), provider: 'groq', model: 'llama-3.3-70b' }; }
-    catch (e) { console.warn('Groq failed:', e); }
+  const selected = getSelectedProvider();
+
+  // Helper: try a specific provider and return its result (throws on failure)
+  async function tryProvider(p: AIProvider): Promise<AIResponse | null> {
+    switch (p) {
+      case 'groq':
+        if (getApiKey('groq') || env.VITE_GROQ_API_KEY)
+          return { text: await queryGroq(prompt), provider: 'groq', model: 'llama-3.3-70b' };
+        break;
+      case 'deepseek':
+        if (getApiKey('deepseek') || env.VITE_DEEPSEEK_API_KEY)
+          return { text: await queryDeepSeek(prompt), provider: 'deepseek', model: 'deepseek-chat' };
+        break;
+      case 'gemini':
+        if (getApiKey('gemini') || env.VITE_GEMINI_API_KEY)
+          return { text: await queryGemini(prompt), provider: 'gemini', model: 'gemini-1.5-flash' };
+        break;
+      case 'openrouter':
+        if (getApiKey('openrouter') || env.VITE_OPENROUTER_API_KEY)
+          return { text: await queryOpenRouter(prompt), provider: 'openrouter', model: 'llama-3.1-8b:free' };
+        break;
+      case 'ollama':
+        return { text: await queryOllama(prompt), provider: 'ollama' };
+    }
+    return null;
   }
-  if (getApiKey('deepseek') || env.VITE_DEEPSEEK_API_KEY) {
-    try { return { text: await queryDeepSeek(prompt), provider: 'deepseek', model: 'deepseek-chat' }; }
-    catch (e) { console.warn('DeepSeek failed:', e); }
+
+  // If the user has explicitly chosen a provider, try it first
+  if (selected !== 'auto') {
+    try {
+      const result = await tryProvider(selected as AIProvider);
+      if (result) return result;
+    } catch (e) {
+      console.warn(`Selected provider (${selected}) failed:`, e);
+    }
   }
-  if (getApiKey('gemini') || env.VITE_GEMINI_API_KEY) {
-    try { return { text: await queryGemini(prompt), provider: 'gemini', model: 'gemini-1.5-flash' }; }
-    catch (e) { console.warn('Gemini failed:', e); }
+
+  // Auto-priority fallback
+  const order: AIProvider[] = ['groq', 'deepseek', 'gemini', 'openrouter', 'ollama'];
+  for (const p of order) {
+    if (selected !== 'auto' && p === (selected as AIProvider)) continue; // already tried
+    try {
+      const result = await tryProvider(p);
+      if (result) return result;
+    } catch (e) {
+      console.warn(`${p} failed:`, e);
+    }
   }
-  if (getApiKey('openrouter') || env.VITE_OPENROUTER_API_KEY) {
-    try { return { text: await queryOpenRouter(prompt), provider: 'openrouter', model: 'llama-3.1-8b:free' }; }
-    catch (e) { console.warn('OpenRouter failed:', e); }
-  }
-  try { return { text: await queryOllama(prompt), provider: 'ollama' }; }
-  catch { /* not running locally */ }
 
   return { text: getDemoResponse(prompt), provider: 'demo' };
 }
 
 export function activeProvider(): AIProvider {
   const env = import.meta.env;
+  const selected = getSelectedProvider();
+  if (selected !== 'auto') {
+    // Validate that the selected provider still has a key
+    const hasKey: Record<string, boolean> = {
+      groq: !!(getApiKey('groq') || env.VITE_GROQ_API_KEY),
+      deepseek: !!(getApiKey('deepseek') || env.VITE_DEEPSEEK_API_KEY),
+      gemini: !!(getApiKey('gemini') || env.VITE_GEMINI_API_KEY),
+      openrouter: !!(getApiKey('openrouter') || env.VITE_OPENROUTER_API_KEY),
+      ollama: true,
+    };
+    if (hasKey[selected]) return selected as AIProvider;
+  }
   if (getApiKey('groq') || env.VITE_GROQ_API_KEY) return 'groq';
   if (getApiKey('deepseek') || env.VITE_DEEPSEEK_API_KEY) return 'deepseek';
   if (getApiKey('gemini') || env.VITE_GEMINI_API_KEY) return 'gemini';

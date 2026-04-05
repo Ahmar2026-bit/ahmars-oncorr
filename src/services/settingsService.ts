@@ -43,3 +43,19 @@ export function saveApiKeys(keys: Partial<ApiKeys>): void {
 export function getApiKey(provider: keyof ApiKeys): string {
   return localStorage.getItem(KEYS[provider]) ?? '';
 }
+
+const SELECTED_PROVIDER_KEY = 'oncorr_selected_provider';
+
+/** Returns the user-chosen provider, or 'auto' if none has been explicitly set. */
+export function getSelectedProvider(): string {
+  return localStorage.getItem(SELECTED_PROVIDER_KEY) ?? 'auto';
+}
+
+/** Persist the user's provider choice. Pass 'auto' to clear the preference. */
+export function saveSelectedProvider(provider: string): void {
+  if (provider === 'auto') {
+    localStorage.removeItem(SELECTED_PROVIDER_KEY);
+  } else {
+    localStorage.setItem(SELECTED_PROVIDER_KEY, provider);
+  }
+}

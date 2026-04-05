@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, Key, ExternalLink } from 'lucide-react';
-import { getStoredApiKeys, saveApiKeys, type ApiKeys } from '../services/settingsService';
+import { X, Key, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { getStoredApiKeys, saveApiKeys, getSelectedProvider, saveSelectedProvider, type ApiKeys } from '../services/settingsService';
 
 interface Props {
   onClose: () => void;
@@ -51,14 +51,20 @@ const PROVIDERS: {
 
 export default function SettingsModal({ onClose, onSaved }: Props) {
   const [keys, setKeys] = useState<ApiKeys>({ groq: '', deepseek: '', gemini: '', openrouter: '' });
+  const [selectedProvider, setSelectedProvider] = useState<string>('auto');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     setKeys(getStoredApiKeys());
+    setSelectedProvider(getSelectedProvider());
   }, []);
+
+  // Providers that already have a key entered (in local form state)
+  const configuredProviders = PROVIDERS.filter((p) => keys[p.id].trim().length > 0);
 
   function handleSave() {
     saveApiKeys(keys);
+    saveSelectedProvider(selectedProvider);
     setSaved(true);
     setTimeout(() => {
       setSaved(false);
@@ -115,6 +121,43 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
               <p className="text-xs text-gray-400 mt-0.5">{p.note}</p>
             </div>
           ))}
+
+          {/* Active provider selector — only shown when 2+ providers are configured */}
+          {configuredProviders.length >= 2 && (
+            <div className="pt-1 border-t border-gray-100">
+              <p className="text-sm font-medium text-gray-700 mb-2">Active provider</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setSelectedProvider('auto')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    selectedProvider === 'auto'
+                      ? 'bg-brand-600 text-white border-brand-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
+                  }`}
+                >
+                  {selectedProvider === 'auto' && <CheckCircle2 size={12} />}
+                  Auto (first available)
+                </button>
+                {configuredProviders.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedProvider(p.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                      selectedProvider === p.id
+                        ? 'bg-brand-600 text-white border-brand-600'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
+                    }`}
+                  >
+                    {selectedProvider === p.id && <CheckCircle2 size={12} />}
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">
+                "Auto" uses the first provider in the list that has a key.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
