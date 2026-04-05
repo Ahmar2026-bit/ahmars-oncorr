@@ -185,8 +185,8 @@ export async function askAI(prompt: string): Promise<AIResponse> {
   const selected = getSelectedProvider();
 
   // Helper: try a specific provider and return its result (throws on failure)
-  async function tryProvider(p: AIProvider): Promise<AIResponse | null> {
-    switch (p) {
+  async function tryProvider(provider: AIProvider): Promise<AIResponse | null> {
+    switch (provider) {
       case 'groq':
         if (getApiKey('groq') || env.VITE_GROQ_API_KEY)
           return { text: await queryGroq(prompt), provider: 'groq', model: 'llama-3.3-70b' };
@@ -221,13 +221,13 @@ export async function askAI(prompt: string): Promise<AIResponse> {
 
   // Auto-priority fallback
   const order: AIProvider[] = ['groq', 'deepseek', 'gemini', 'openrouter', 'ollama'];
-  for (const p of order) {
-    if (selected !== 'auto' && p === (selected as AIProvider)) continue; // already tried
+  for (const provider of order) {
+    if (selected !== 'auto' && provider === (selected as AIProvider)) continue; // already tried
     try {
-      const result = await tryProvider(p);
+      const result = await tryProvider(provider);
       if (result) return result;
     } catch (e) {
-      console.warn(`${p} failed:`, e);
+      console.warn(`${provider} failed:`, e);
     }
   }
 
