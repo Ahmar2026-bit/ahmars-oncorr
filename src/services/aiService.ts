@@ -9,6 +9,7 @@
  */
 
 import Groq from 'groq-sdk';
+import { getApiKey } from './settingsService';
 
 export type AIProvider = 'groq' | 'deepseek' | 'gemini' | 'openrouter' | 'ollama' | 'demo';
 
@@ -38,7 +39,7 @@ a live LLM analysing your specific query.
 - **OpenRouter** — openrouter.ai → free Llama/Gemma models
 - **Ollama** — local models, no key, unlimited
 
-Add any key to your \`.env.local\` file to enable live AI responses.`,
+Add any key to your \`.env.local\` file, or click the **⚙ Settings** button in the header to enter a key directly in your browser.`,
 
   tp53_brca1: `**TP53 & BRCA1 — Oncology Context**
 
@@ -107,7 +108,7 @@ async function queryOpenAICompat(
 }
 
 async function queryGroq(prompt: string): Promise<string> {
-  const apiKey = import.meta.env.VITE_GROQ_API_KEY as string | undefined;
+  const apiKey = getApiKey('groq') || (import.meta.env.VITE_GROQ_API_KEY as string | undefined);
   if (!apiKey) throw new Error('No Groq key');
   const client = new Groq({ apiKey, dangerouslyAllowBrowser: true });
   const completion = await client.chat.completions.create({
@@ -125,13 +126,13 @@ async function queryGroq(prompt: string): Promise<string> {
 }
 
 async function queryDeepSeek(prompt: string): Promise<string> {
-  const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY as string | undefined;
+  const apiKey = getApiKey('deepseek') || (import.meta.env.VITE_DEEPSEEK_API_KEY as string | undefined);
   if (!apiKey) throw new Error('No DeepSeek key');
   return queryOpenAICompat('https://api.deepseek.com/v1', apiKey, 'deepseek-chat', prompt);
 }
 
 async function queryGemini(prompt: string): Promise<string> {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+  const apiKey = getApiKey('gemini') || (import.meta.env.VITE_GEMINI_API_KEY as string | undefined);
   if (!apiKey) throw new Error('No Gemini key');
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
@@ -151,7 +152,7 @@ async function queryGemini(prompt: string): Promise<string> {
 }
 
 async function queryOpenRouter(prompt: string): Promise<string> {
-  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined;
+  const apiKey = getApiKey('openrouter') || (import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined);
   if (!apiKey) throw new Error('No OpenRouter key');
   return queryOpenAICompat(
     'https://openrouter.ai/api/v1',
@@ -181,19 +182,19 @@ async function queryOllama(prompt: string): Promise<string> {
 
 export async function askAI(prompt: string): Promise<AIResponse> {
   const env = import.meta.env;
-  if (env.VITE_GROQ_API_KEY) {
+  if (getApiKey('groq') || env.VITE_GROQ_API_KEY) {
     try { return { text: await queryGroq(prompt), provider: 'groq', model: 'llama-3.3-70b' }; }
     catch (e) { console.warn('Groq failed:', e); }
   }
-  if (env.VITE_DEEPSEEK_API_KEY) {
+  if (getApiKey('deepseek') || env.VITE_DEEPSEEK_API_KEY) {
     try { return { text: await queryDeepSeek(prompt), provider: 'deepseek', model: 'deepseek-chat' }; }
     catch (e) { console.warn('DeepSeek failed:', e); }
   }
-  if (env.VITE_GEMINI_API_KEY) {
+  if (getApiKey('gemini') || env.VITE_GEMINI_API_KEY) {
     try { return { text: await queryGemini(prompt), provider: 'gemini', model: 'gemini-1.5-flash' }; }
     catch (e) { console.warn('Gemini failed:', e); }
   }
-  if (env.VITE_OPENROUTER_API_KEY) {
+  if (getApiKey('openrouter') || env.VITE_OPENROUTER_API_KEY) {
     try { return { text: await queryOpenRouter(prompt), provider: 'openrouter', model: 'llama-3.1-8b:free' }; }
     catch (e) { console.warn('OpenRouter failed:', e); }
   }
@@ -205,9 +206,9 @@ export async function askAI(prompt: string): Promise<AIResponse> {
 
 export function activeProvider(): AIProvider {
   const env = import.meta.env;
-  if (env.VITE_GROQ_API_KEY) return 'groq';
-  if (env.VITE_DEEPSEEK_API_KEY) return 'deepseek';
-  if (env.VITE_GEMINI_API_KEY) return 'gemini';
-  if (env.VITE_OPENROUTER_API_KEY) return 'openrouter';
+  if (getApiKey('groq') || env.VITE_GROQ_API_KEY) return 'groq';
+  if (getApiKey('deepseek') || env.VITE_DEEPSEEK_API_KEY) return 'deepseek';
+  if (getApiKey('gemini') || env.VITE_GEMINI_API_KEY) return 'gemini';
+  if (getApiKey('openrouter') || env.VITE_OPENROUTER_API_KEY) return 'openrouter';
   return 'demo';
 }
