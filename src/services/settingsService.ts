@@ -15,6 +15,10 @@ export interface ApiKeys {
 }
 
 export function getStoredApiKeys(): ApiKeys {
+  // Keys are intentionally stored as clear text in localStorage — this is a
+  // client-side-only SPA and the keys are sent directly from the browser to the
+  // provider APIs. There is no server-side storage, and no more secure browser
+  // storage option is available for credentials that must be readable by JS.
   return {
     groq: localStorage.getItem(KEYS.groq) ?? '',
     deepseek: localStorage.getItem(KEYS.deepseek) ?? '',
