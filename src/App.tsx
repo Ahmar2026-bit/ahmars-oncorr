@@ -8,9 +8,25 @@ import ProteinNetwork from './components/ProteinNetwork';
 import HypothesisValidator from './components/HypothesisValidator';
 import VirtualLab from './components/VirtualLab';
 import ManuscriptDraft from './components/ManuscriptDraft';
+import ProteomicsAnalysis from './components/ProteomicsAnalysis';
+import RNASeqAnalysis from './components/RNASeqAnalysis';
+import DrugPredictor from './components/DrugPredictor';
+import ClinicalTrials from './components/ClinicalTrials';
 import { DEFAULT_CANCER_ID } from './data/cancerTypes';
 
-type Tab = 'correlation' | 'hypothesis' | 'virtuallab' | 'manuscript' | 'ai' | 'literature' | 'geo' | 'network';
+type Tab =
+  | 'correlation'
+  | 'hypothesis'
+  | 'virtuallab'
+  | 'manuscript'
+  | 'ai'
+  | 'literature'
+  | 'geo'
+  | 'network'
+  | 'proteomics'
+  | 'rnaseq'
+  | 'drugs'
+  | 'trials';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('correlation');
@@ -28,6 +44,10 @@ export default function App() {
     { id: 'literature',  label: '📚 PubMed' },
     { id: 'geo',         label: '🧬 GEO Datasets' },
     { id: 'network',     label: '🔗 Protein Network' },
+    { id: 'proteomics',  label: '🔭 Proteomics' },
+    { id: 'rnaseq',      label: '📊 RNA-seq' },
+    { id: 'drugs',       label: '💊 Drug Predictor' },
+    { id: 'trials',      label: '🏥 Clinical Trials' },
   ];
 
   return (
@@ -96,6 +116,18 @@ export default function App() {
           )}
           {activeTab === 'network' && (
             <ProteinNetwork geneA={geneA} geneB={geneB} />
+          )}
+          {activeTab === 'proteomics' && (
+            <ProteomicsAnalysis geneA={geneA} geneB={geneB} cancerType={cancerType} />
+          )}
+          {activeTab === 'rnaseq' && (
+            <RNASeqAnalysis geneA={geneA} geneB={geneB} cancerType={cancerType} />
+          )}
+          {activeTab === 'drugs' && (
+            <DrugPredictor geneA={geneA} geneB={geneB} cancerType={cancerType} />
+          )}
+          {activeTab === 'trials' && (
+            <ClinicalTrials geneA={geneA} geneB={geneB} cancerType={cancerType} />
           )}
         </div>
 
