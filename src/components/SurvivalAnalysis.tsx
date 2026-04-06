@@ -248,6 +248,7 @@ interface SurvivalResult {
 
 export default function SurvivalAnalysis({
   geneA,
+  geneB: _geneB,
   cancerType,
 }: {
   geneA: string;

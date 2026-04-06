@@ -177,40 +177,54 @@ export default function TumorBoard({
 
   function printReport() {
     if (!reportRef.current) return;
-    const printContent = reportRef.current.innerHTML;
+
+    // Use the DOM to build the print document safely — no string interpolation of user data
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Tumor Board Report — ${gA}${gB !== 'Gene B' ? '/' + gB : ''} · ${cancer.shortName}</title>
-          <style>
-            body { font-family: Georgia, serif; max-width: 800px; margin: 40px auto; color: #1a1a1a; line-height: 1.6; }
-            h1 { font-size: 20px; border-bottom: 2px solid #333; padding-bottom: 8px; }
-            h2 { font-size: 16px; margin-top: 24px; color: #1e40af; }
-            h3 { font-size: 14px; margin-top: 16px; }
-            strong { font-weight: 700; }
-            li { margin-bottom: 4px; }
-            .header { background: #1e3a5f; color: white; padding: 16px 20px; border-radius: 8px; margin-bottom: 20px; }
-            .header h1 { color: white; border-color: rgba(255,255,255,0.3); font-size: 18px; }
-            .meta { font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px; }
-            @media print { body { margin: 20px; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>OncoCorr Tumor Board Report</h1>
-            <p class="meta">
-              Cancer: ${cancerLabel} · Genes: ${gA}${gB !== 'Gene B' ? ' / ' + gB : ''} · 
-              Generated: ${new Date().toLocaleDateString()}
-            </p>
-          </div>
-          ${printContent}
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+
+    const doc = printWindow.document;
+    doc.open();
+    doc.write('<!DOCTYPE html><html><head></head><body></body></html>');
+    doc.close();
+
+    // Set title safely
+    const geneLabel = gB !== 'Gene B' ? `${gA}/${gB}` : gA;
+    doc.title = `Tumor Board Report — ${geneLabel} · ${cancer.shortName}`;
+
+    // Inject stylesheet
+    const style = doc.createElement('style');
+    style.textContent = [
+      'body{font-family:Georgia,serif;max-width:800px;margin:40px auto;color:#1a1a1a;line-height:1.6}',
+      'h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:8px}',
+      'h2{font-size:16px;margin-top:24px;color:#1e40af}',
+      'h3{font-size:14px;margin-top:16px}',
+      'strong{font-weight:700}li{margin-bottom:4px}',
+      '.header{background:#1e3a5f;color:white;padding:16px 20px;border-radius:8px;margin-bottom:20px}',
+      '.header h1{color:white;border-color:rgba(255,255,255,.3);font-size:18px}',
+      '.meta{font-size:12px;color:rgba(255,255,255,.8);margin-top:4px}',
+      '@media print{body{margin:20px}}',
+    ].join('');
+    doc.head.appendChild(style);
+
+    // Build header using DOM APIs to avoid XSS
+    const header = doc.createElement('div');
+    header.className = 'header';
+
+    const h1 = doc.createElement('h1');
+    h1.textContent = 'OncoCorr Tumor Board Report';
+    header.appendChild(h1);
+
+    const meta = doc.createElement('p');
+    meta.className = 'meta';
+    meta.textContent =
+      `Cancer: ${cancerLabel} · Genes: ${geneLabel} · Generated: ${new Date().toLocaleDateString()}`;
+    header.appendChild(meta);
+    doc.body.appendChild(header);
+
+    // Import the report HTML (already rendered by renderMarkdown which escapes input)
+    const reportNode = reportRef.current.cloneNode(true) as HTMLElement;
+    doc.body.appendChild(reportNode);
+
     printWindow.focus();
     printWindow.print();
   }

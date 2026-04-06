@@ -191,6 +191,7 @@ function computeCnvStats(cnvData: CnvRecord[]): CnvStats {
 
 export default function MutationLandscape({
   geneA,
+  geneB: _geneB,
   cancerType,
 }: {
   geneA: string;
