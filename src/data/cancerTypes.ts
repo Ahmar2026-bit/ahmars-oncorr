@@ -28,5 +28,5 @@ export const CANCER_TYPES: CancerType[] = [
 export const DEFAULT_CANCER_ID = 'BRCA';
 
 export function getCancerById(id: string): CancerType {
-  return CANCER_TYPES.find((c) => c.id === id) ?? CANCER_TYPES[1];
+  return CANCER_TYPES.find((c) => c.id === id) ?? CANCER_TYPES.find((c) => c.id === DEFAULT_CANCER_ID)!;
 }

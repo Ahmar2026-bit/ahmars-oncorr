@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FlaskConical, Loader2, CheckCircle, XCircle, AlertCircle, ClipboardList } from 'lucide-react';
 import { askAI } from '../services/aiService';
 import { getCancerById } from '../data/cancerTypes';
@@ -56,14 +56,26 @@ export default function HypothesisValidator({
   correlationR: number | null;
 }) {
   const cancer = getCancerById(cancerType);
-  const defaultHypothesis =
-    geneA && geneB
-      ? `${geneA} expression positively correlates with ${geneB} in ${cancer.shortName} and is associated with altered patient prognosis.`
-      : '';
 
-  const [hypothesis, setHypothesis] = useState(defaultHypothesis);
+  function buildDefaultHypothesis(a: string, b: string, shortName: string) {
+    return a && b
+      ? `${a} expression positively correlates with ${b} in ${shortName} and is associated with altered patient prognosis.`
+      : '';
+  }
+
+  const [hypothesis, setHypothesis] = useState(() => buildDefaultHypothesis(geneA, geneB, cancer.shortName));
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Track the last auto-generated hypothesis so we only auto-update when the user hasn't customised it
+  const lastAutoRef = useRef(hypothesis);
+  useEffect(() => {
+    const next = buildDefaultHypothesis(geneA, geneB, getCancerById(cancerType).shortName);
+    if (hypothesis === lastAutoRef.current) {
+      setHypothesis(next);
+    }
+    lastAutoRef.current = next;
+  }, [geneA, geneB, cancerType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function validate() {
     const h = hypothesis.trim();
