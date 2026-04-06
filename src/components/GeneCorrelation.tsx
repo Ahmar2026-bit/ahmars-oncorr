@@ -16,6 +16,7 @@ interface CorrelationPoint {
   x: number;
   y: number;
   sample: string;
+  cancerTypeId: string;
 }
 
 const PALETTES = {
@@ -29,10 +30,28 @@ const PALETTES = {
 
 type PaletteKey = keyof typeof PALETTES;
 
-interface CorrelationPoint {
-  x: number;
-  y: number;
-  sample: string;
+const PAN_CANCER_COHORTS = [
+  'BRCA', 'LUAD', 'COAD', 'GBM', 'OV', 'KIRC', 'PRAD', 'UCEC', 'SKCM', 'STAD',
+];
+
+function normalCDF(x: number): number {
+  const ax = Math.abs(x);
+  const t = 1 / (1 + 0.2316419 * ax);
+  const d = 0.3989423 * Math.exp(-ax * ax / 2);
+  const upperTail = d * t * (0.3193815 + t * (-0.3565638 + t * (1.7814779 + t * (-1.8212560 + t * 1.3302744))));
+  return x >= 0 ? 1 - upperTail : upperTail;
+}
+
+function pValueFromR(r: number, n: number): number {
+  if (n <= 2) return 1;
+  const t = r * Math.sqrt(n - 2) / Math.sqrt(Math.max(1e-10, 1 - r * r));
+  return 2 * normalCDF(-Math.abs(t));
+}
+
+function formatP(p: number): string {
+  if (p < 0.001) return 'p < 0.001';
+  if (p < 0.01) return `p = ${p.toFixed(3)}`;
+  return `p = ${p.toFixed(3)}`;
 }
 
 function generateSyntheticData(
