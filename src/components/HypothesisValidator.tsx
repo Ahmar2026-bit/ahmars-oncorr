@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FlaskConical, Loader2, CheckCircle, XCircle, AlertCircle, ClipboardList } from 'lucide-react';
 import { askAI } from '../services/aiService';
 import { getCancerById } from '../data/cancerTypes';
+import { renderMarkdown } from '../utils/markdown';
 import ProviderBadge from './ProviderBadge';
 import type { AIProvider } from '../services/aiService';
 
@@ -30,31 +31,11 @@ function parseVerdict(text: string): ValidationResult['verdict'] {
   return null;
 }
 
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function renderMarkdown(text: string): string {
-  return escapeHtml(text)
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/^### (.+)$/gm, '<h3 class="font-semibold text-sm mt-3 mb-1">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 class="font-semibold text-base mt-4 mb-1">$2</h2>')
-    .replace(/^- (.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
-    .replace(/\n\n/g, '</p><p class="mt-2">')
-    .replace(/^(?!<[hlp])(.+)$/gm, '$1');
-}
-
 const VERDICT_CONFIG = {
-  supported:     { label: 'Strongly Supported',    icon: CheckCircle,  bg: 'bg-green-100',  text: 'text-green-700',  border: 'border-green-300' },
-  partial:       { label: 'Partially Supported',   icon: AlertCircle,  bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
-  inconclusive:  { label: 'Inconclusive',           icon: AlertCircle,  bg: 'bg-gray-100',   text: 'text-gray-600',   border: 'border-gray-300' },
-  'not-supported': { label: 'Not Supported',        icon: XCircle,      bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-300' },
+  supported:       { label: 'Strongly Supported',  icon: CheckCircle, bg: 'bg-green-100',  text: 'text-green-700',  border: 'border-green-300' },
+  partial:         { label: 'Partially Supported', icon: AlertCircle, bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
+  inconclusive:    { label: 'Inconclusive',          icon: AlertCircle, bg: 'bg-gray-100',   text: 'text-gray-600',   border: 'border-gray-300' },
+  'not-supported': { label: 'Not Supported',         icon: XCircle,     bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-300' },
 };
 
 const EXAMPLE_HYPOTHESES = [
