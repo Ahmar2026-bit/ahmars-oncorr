@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User } from 'lucide-react';
 import { askAI, type AIProvider } from '../services/aiService';
 import ProviderBadge from './ProviderBadge';
+import ChatChart from './ChatChart';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -28,6 +29,26 @@ function renderMarkdown(text: string): string {
     .replace(/^- (.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
     .replace(/\n\n/g, '</p><p class="mt-2">')
     .replace(/^(?!<[hlp])(.+)$/gm, '$1');
+}
+
+type ContentPart = { type: 'text'; content: string } | { type: 'chart'; content: string };
+
+function parseContent(raw: string): ContentPart[] {
+  const parts: ContentPart[] = [];
+  const regex = /```chart\n([\s\S]*?)\n?```/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(raw)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', content: raw.slice(lastIndex, match.index) });
+    }
+    parts.push({ type: 'chart', content: match[1] });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < raw.length) {
+    parts.push({ type: 'text', content: raw.slice(lastIndex) });
+  }
+  return parts.length ? parts : [{ type: 'text', content: raw }];
 }
 
 export default function AIChat({ geneA, geneB }: { geneA: string; geneB: string }) {
@@ -117,8 +138,18 @@ export default function AIChat({ geneA, geneB }: { geneA: string; geneB: string 
                     ? 'bg-brand-600 text-white rounded-tr-sm'
                     : 'bg-gray-50 border border-gray-200 text-gray-800 rounded-tl-sm'
                 }`}
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
-              />
+              >
+                {parseContent(msg.content).map((part, j) =>
+                  part.type === 'chart' ? (
+                    <ChatChart key={j} specJson={part.content} />
+                  ) : (
+                    <div
+                      key={j}
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(part.content) }}
+                    />
+                  ),
+                )}
+              </div>
             </div>
           </div>
         ))}

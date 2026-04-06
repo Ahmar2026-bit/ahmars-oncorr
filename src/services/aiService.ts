@@ -9,6 +9,7 @@
  */
 
 import Groq from 'groq-sdk';
+import { getApiKey, getSelectedProvider } from './settingsService';
 
 export type AIProvider = 'groq' | 'deepseek' | 'gemini' | 'openrouter' | 'ollama' | 'demo';
 
@@ -18,11 +19,26 @@ export interface AIResponse {
   model?: string;
 }
 
+const CHART_FENCE = '```';
 const SYSTEM_PROMPT =
   'You are OncoCorr, an expert oncology & multi-omics research assistant. ' +
   'Provide concise, evidence-based answers about genes, cancer biology, ' +
   'biomarkers, pathway analysis, and clinical correlations. ' +
-  'Use markdown formatting with **bold** for key terms.';
+  'Use markdown formatting with **bold** for key terms.\n\n' +
+  'IMPORTANT — When the user asks for a chart, graph, heatmap, plot, or any visualization, ' +
+  'you MUST respond with a special fenced code block that the app renders as a real interactive chart. ' +
+  'Do NOT say you cannot make charts or graphs. Instead output:\n' +
+  CHART_FENCE + 'chart\n' +
+  '{"type":"bar","title":"Title","xLabel":"X axis","yLabel":"Y axis","data":[{"name":"Gene A","value":8.2}]}\n' +
+  CHART_FENCE + '\n' +
+  'Supported types and their required data shapes:\n' +
+  '• "bar"     — data: [{"name":"Label","value":0}, ...]\n' +
+  '• "line"    — data: [{"name":"Label","value":0}, ...]\n' +
+  '• "scatter" — data: [{"x":0,"y":0}, ...]\n' +
+  '• "heatmap" — genes: ["G1","G2",...], data: [{"row":"G1","col":"G2","value":0.75}, ...] ' +
+  '(include every row×col pair)\n' +
+  'Always fill in realistic, biologically-plausible numeric values. ' +
+  'You may include explanatory text before and/or after the chart block.';
 
 const DEMO_RESPONSES: Record<string, string> = {
   default: `**[Demo Mode — no API key configured]**
@@ -38,7 +54,7 @@ a live LLM analysing your specific query.
 - **OpenRouter** — openrouter.ai → free Llama/Gemma models
 - **Ollama** — local models, no key, unlimited
 
-Add any key to your \`.env.local\` file to enable live AI responses.`,
+Add any key to your \`.env.local\` file, or click the **⚙ Settings** button in the header to enter a key directly in your browser.`,
 
   tp53_brca1: `**TP53 & BRCA1 — Oncology Context**
 
@@ -95,7 +111,7 @@ async function queryOpenAICompat(
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: prompt },
       ],
-      max_tokens: 1024,
+      max_tokens: 2048,
       temperature: 0.4,
     }),
   });
@@ -107,7 +123,7 @@ async function queryOpenAICompat(
 }
 
 async function queryGroq(prompt: string): Promise<string> {
-  const apiKey = import.meta.env.VITE_GROQ_API_KEY as string | undefined;
+  const apiKey = getApiKey('groq') || (import.meta.env.VITE_GROQ_API_KEY as string | undefined);
   if (!apiKey) throw new Error('No Groq key');
   const client = new Groq({ apiKey, dangerouslyAllowBrowser: true });
   const completion = await client.chat.completions.create({
@@ -116,7 +132,7 @@ async function queryGroq(prompt: string): Promise<string> {
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: prompt },
     ],
-    max_tokens: 1024,
+    max_tokens: 2048,
     temperature: 0.4,
   });
   const text = completion.choices[0]?.message?.content;
@@ -125,13 +141,13 @@ async function queryGroq(prompt: string): Promise<string> {
 }
 
 async function queryDeepSeek(prompt: string): Promise<string> {
-  const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY as string | undefined;
+  const apiKey = getApiKey('deepseek') || (import.meta.env.VITE_DEEPSEEK_API_KEY as string | undefined);
   if (!apiKey) throw new Error('No DeepSeek key');
   return queryOpenAICompat('https://api.deepseek.com/v1', apiKey, 'deepseek-chat', prompt);
 }
 
 async function queryGemini(prompt: string): Promise<string> {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+  const apiKey = getApiKey('gemini') || (import.meta.env.VITE_GEMINI_API_KEY as string | undefined);
   if (!apiKey) throw new Error('No Gemini key');
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
@@ -140,7 +156,7 @@ async function queryGemini(prompt: string): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${prompt}` }] }],
-      generationConfig: { maxOutputTokens: 1024, temperature: 0.4 },
+      generationConfig: { maxOutputTokens: 2048, temperature: 0.4 },
     }),
   });
   if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
@@ -151,7 +167,7 @@ async function queryGemini(prompt: string): Promise<string> {
 }
 
 async function queryOpenRouter(prompt: string): Promise<string> {
-  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined;
+  const apiKey = getApiKey('openrouter') || (import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined);
   if (!apiKey) throw new Error('No OpenRouter key');
   return queryOpenAICompat(
     'https://openrouter.ai/api/v1',
@@ -181,33 +197,75 @@ async function queryOllama(prompt: string): Promise<string> {
 
 export async function askAI(prompt: string): Promise<AIResponse> {
   const env = import.meta.env;
-  if (env.VITE_GROQ_API_KEY) {
-    try { return { text: await queryGroq(prompt), provider: 'groq', model: 'llama-3.3-70b' }; }
-    catch (e) { console.warn('Groq failed:', e); }
+  const selected = getSelectedProvider();
+
+  // Helper: try a specific provider and return its result (throws on failure)
+  async function tryProvider(provider: AIProvider): Promise<AIResponse | null> {
+    switch (provider) {
+      case 'groq':
+        if (getApiKey('groq') || env.VITE_GROQ_API_KEY)
+          return { text: await queryGroq(prompt), provider: 'groq', model: 'llama-3.3-70b' };
+        break;
+      case 'deepseek':
+        if (getApiKey('deepseek') || env.VITE_DEEPSEEK_API_KEY)
+          return { text: await queryDeepSeek(prompt), provider: 'deepseek', model: 'deepseek-chat' };
+        break;
+      case 'gemini':
+        if (getApiKey('gemini') || env.VITE_GEMINI_API_KEY)
+          return { text: await queryGemini(prompt), provider: 'gemini', model: 'gemini-1.5-flash' };
+        break;
+      case 'openrouter':
+        if (getApiKey('openrouter') || env.VITE_OPENROUTER_API_KEY)
+          return { text: await queryOpenRouter(prompt), provider: 'openrouter', model: 'llama-3.1-8b:free' };
+        break;
+      case 'ollama':
+        return { text: await queryOllama(prompt), provider: 'ollama' };
+    }
+    return null;
   }
-  if (env.VITE_DEEPSEEK_API_KEY) {
-    try { return { text: await queryDeepSeek(prompt), provider: 'deepseek', model: 'deepseek-chat' }; }
-    catch (e) { console.warn('DeepSeek failed:', e); }
+
+  // If the user has explicitly chosen a provider, try it first
+  if (selected !== 'auto') {
+    try {
+      const result = await tryProvider(selected as AIProvider);
+      if (result) return result;
+    } catch (e) {
+      console.warn(`Selected provider (${selected}) failed:`, e);
+    }
   }
-  if (env.VITE_GEMINI_API_KEY) {
-    try { return { text: await queryGemini(prompt), provider: 'gemini', model: 'gemini-1.5-flash' }; }
-    catch (e) { console.warn('Gemini failed:', e); }
+
+  // Auto-priority fallback
+  const order: AIProvider[] = ['groq', 'deepseek', 'gemini', 'openrouter', 'ollama'];
+  for (const provider of order) {
+    if (selected !== 'auto' && provider === (selected as AIProvider)) continue; // already tried
+    try {
+      const result = await tryProvider(provider);
+      if (result) return result;
+    } catch (e) {
+      console.warn(`${provider} failed:`, e);
+    }
   }
-  if (env.VITE_OPENROUTER_API_KEY) {
-    try { return { text: await queryOpenRouter(prompt), provider: 'openrouter', model: 'llama-3.1-8b:free' }; }
-    catch (e) { console.warn('OpenRouter failed:', e); }
-  }
-  try { return { text: await queryOllama(prompt), provider: 'ollama' }; }
-  catch { /* not running locally */ }
 
   return { text: getDemoResponse(prompt), provider: 'demo' };
 }
 
 export function activeProvider(): AIProvider {
   const env = import.meta.env;
-  if (env.VITE_GROQ_API_KEY) return 'groq';
-  if (env.VITE_DEEPSEEK_API_KEY) return 'deepseek';
-  if (env.VITE_GEMINI_API_KEY) return 'gemini';
-  if (env.VITE_OPENROUTER_API_KEY) return 'openrouter';
+  const selected = getSelectedProvider();
+  if (selected !== 'auto') {
+    // Validate that the selected provider still has a key
+    const hasKey: Record<string, boolean> = {
+      groq: !!(getApiKey('groq') || env.VITE_GROQ_API_KEY),
+      deepseek: !!(getApiKey('deepseek') || env.VITE_DEEPSEEK_API_KEY),
+      gemini: !!(getApiKey('gemini') || env.VITE_GEMINI_API_KEY),
+      openrouter: !!(getApiKey('openrouter') || env.VITE_OPENROUTER_API_KEY),
+      ollama: true,
+    };
+    if (hasKey[selected]) return selected as AIProvider;
+  }
+  if (getApiKey('groq') || env.VITE_GROQ_API_KEY) return 'groq';
+  if (getApiKey('deepseek') || env.VITE_DEEPSEEK_API_KEY) return 'deepseek';
+  if (getApiKey('gemini') || env.VITE_GEMINI_API_KEY) return 'gemini';
+  if (getApiKey('openrouter') || env.VITE_OPENROUTER_API_KEY) return 'openrouter';
   return 'demo';
 }
