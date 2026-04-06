@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { Shield, Loader2, AlertCircle, Database, Info } from 'lucide-react';
 import { getCancerById } from '../data/cancerTypes';
-import { askAI } from '../services/aiService';
+import { askAI, activeProvider } from '../services/aiService';
 import { renderMarkdown } from '../utils/markdown';
 import ProviderBadge from './ProviderBadge';
 import type { AIProvider } from '../services/aiService';
@@ -80,7 +80,7 @@ export default function ImmuneInfiltration({
   const [gene, setGene] = useState(geneA || '');
   const [result, setResult] = useState<ImmuneResult | null>(null);
   const [aiText, setAiText] = useState('');
-  const [aiProvider, setAiProvider] = useState<AIProvider>('demo');
+  const [aiProvider, setAiProvider] = useState<AIProvider>(activeProvider);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [analysed, setAnalysed] = useState(false);

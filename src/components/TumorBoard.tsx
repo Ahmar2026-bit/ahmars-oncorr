@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { ClipboardList, Loader2, Printer, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { getCancerById, CANCER_TYPES } from '../data/cancerTypes';
-import { askAI } from '../services/aiService';
+import { askAI, activeProvider } from '../services/aiService';
 import { renderMarkdown } from '../utils/markdown';
 import ProviderBadge from './ProviderBadge';
 import type { AIProvider } from '../services/aiService';
@@ -109,7 +109,7 @@ export default function TumorBoard({
   const [patientCase, setPatientCase] = useState<PatientCase>(INITIAL_CASE);
   const [selectedCancer, setSelectedCancer] = useState(cancerType);
   const [aiText, setAiText] = useState('');
-  const [aiProvider, setAiProvider] = useState<AIProvider>('demo');
+  const [aiProvider, setAiProvider] = useState<AIProvider>(activeProvider);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
