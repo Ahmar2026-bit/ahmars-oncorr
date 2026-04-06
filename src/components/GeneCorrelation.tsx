@@ -9,7 +9,8 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { TrendingUp, RefreshCw } from 'lucide-react';
+import { TrendingUp, RefreshCw, ChevronDown } from 'lucide-react';
+import { CANCER_TYPES, getCancerById } from '../data/cancerTypes';
 
 interface CorrelationPoint {
   x: number;
@@ -20,10 +21,11 @@ interface CorrelationPoint {
 function generateSyntheticData(
   geneA: string,
   geneB: string,
+  cancerType = 'BRCA',
   n = 60,
 ): { points: CorrelationPoint[]; r: number } {
-  // Deterministic seed from gene names so the same pair always shows the same data
-  const seed = [...(geneA + geneB)].reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  // Deterministic seed from gene names + cancer type so results are reproducible per cohort
+  const seed = [...(geneA + geneB + cancerType)].reduce((acc, c) => acc + c.charCodeAt(0), 0);
   let s = seed;
   const rng = () => {
     s = (s * 1664525 + 1013904223) & 0xffffffff;
@@ -66,11 +68,17 @@ function rLabel(r: number): { text: string; color: string } {
 export default function GeneCorrelation({
   geneA,
   geneB,
+  cancerType,
   onGenesChange,
+  onCancerChange,
+  onCorrelation,
 }: {
   geneA: string;
   geneB: string;
+  cancerType: string;
   onGenesChange: (a: string, b: string) => void;
+  onCancerChange: (c: string) => void;
+  onCorrelation: (r: number) => void;
 }) {
   const [localA, setLocalA] = useState(geneA);
   const [localB, setLocalB] = useState(geneB);
@@ -80,14 +88,48 @@ export default function GeneCorrelation({
     const a = localA.trim().toUpperCase();
     const b = localB.trim().toUpperCase();
     if (!a || !b) return;
-    setData(generateSyntheticData(a, b));
+    const result = generateSyntheticData(a, b, cancerType);
+    setData(result);
     onGenesChange(a, b);
+    onCorrelation(result.r);
   }
 
   const label = data ? rLabel(data.r) : null;
 
+  const cancer = getCancerById(cancerType);
+
   return (
     <div className="space-y-4">
+      {/* Cancer type selector */}
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">TCGA Cancer Cohort</label>
+        <div className="relative inline-block w-full max-w-sm">
+          <select
+            value={cancerType}
+            onChange={(e) => {
+              onCancerChange(e.target.value);
+              if (data) {
+                const a = localA.trim().toUpperCase();
+                const b = localB.trim().toUpperCase();
+                if (a && b) {
+                  const result = generateSyntheticData(a, b, e.target.value);
+                  setData(result);
+                  onCorrelation(result.r);
+                }
+              }
+            }}
+            className="w-full appearance-none border border-gray-300 rounded-lg pl-3 pr-8 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+          >
+            {CANCER_TYPES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label} ({c.samples.toLocaleString()} samples)
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+        </div>
+      </div>
+
       {/* Gene inputs */}
       <div className="flex gap-3 items-end flex-wrap">
         <div>
@@ -140,7 +182,7 @@ export default function GeneCorrelation({
             </span>
             <span className={`text-xs font-medium ${label!.color}`}>{label!.text}</span>
             <span className="text-xs text-gray-400 ml-auto">
-              Synthetic TCGA-like data · {data.points.length} samples
+              Synthetic TCGA-like data · {cancer.shortName} · {data.points.length} samples
             </span>
           </div>
 
