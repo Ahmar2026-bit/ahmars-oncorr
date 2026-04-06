@@ -59,7 +59,7 @@ function generateSyntheticData(
   geneB: string,
   cancerType = 'BRCA',
   n = 60,
-): { points: CorrelationPoint[]; r: number } {
+): { points: CorrelationPoint[]; r: number; pValue: number } {
   // Deterministic seed from gene names + cancer type so results are reproducible per cohort
   const seed = [...(geneA + geneB + cancerType)].reduce((acc, c) => acc + c.charCodeAt(0), 0);
   let s = seed;
@@ -76,7 +76,11 @@ function generateSyntheticData(
     const x = rng() * 10 + 1;
     const noise = (rng() - 0.5) * (1 - Math.abs(baseR)) * 8;
     const y = baseR * x + (rng() * 3 + 1) + noise;
-    points.push({ x: +x.toFixed(2), y: +Math.max(0, y).toFixed(2), sample: `TCGA-${i + 1}` });
+    const cancerTypeId =
+      cancerType === 'PanCancer'
+        ? PAN_CANCER_COHORTS[i % PAN_CANCER_COHORTS.length]
+        : cancerType;
+    points.push({ x: +x.toFixed(2), y: +Math.max(0, y).toFixed(2), sample: `TCGA-${i + 1}`, cancerTypeId });
   }
 
   // Compute Pearson r from generated points
@@ -89,8 +93,8 @@ function generateSyntheticData(
       points.reduce((s, p) => s + (p.y - meanY) ** 2, 0),
   );
   const r = den === 0 ? 0 : num / den;
-
-  return { points, r: +r.toFixed(3) };
+  const pValue = pValueFromR(r, n2);
+  return { points, r: +r.toFixed(3), pValue };
 }
 
 function rLabel(r: number): { text: string; color: string } {
@@ -118,7 +122,7 @@ export default function GeneCorrelation({
 }) {
   const [localA, setLocalA] = useState(geneA);
   const [localB, setLocalB] = useState(geneB);
-  const [data, setData] = useState<{ points: CorrelationPoint[]; r: number } | null>(null);
+  const [data, setData] = useState<{ points: CorrelationPoint[]; r: number; pValue: number } | null>(null);
   const [pointSize, setPointSize] = useState(4);
   const [palette, setPalette] = useState<PaletteKey>('ocean');
   const [showControls, setShowControls] = useState(false);
@@ -316,13 +320,34 @@ export default function GeneCorrelation({
                 <Tooltip
                   cursor={{ strokeDasharray: '3 3' }}
                   content={({ payload }) => {
-                    if (!payload?.length) return null;
-                    const p = payload[0].payload as CorrelationPoint;
+                    if (!payload?.length || !data) return null;
+                    const pt = payload[0].payload as CorrelationPoint;
+                    const ptCancer = getCancerById(pt.cancerTypeId);
+                    const pv = data.pValue;
+                    const uniqueCancers = [...new Set(data.points.map((d) => d.cancerTypeId))];
                     return (
-                      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs shadow">
-                        <p className="font-medium">{p.sample}</p>
-                        <p>{localA}: {p.x}</p>
-                        <p>{localB}: {p.y}</p>
+                      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs shadow-lg min-w-44">
+                        <p className="font-semibold text-gray-800 mb-1">{pt.sample}</p>
+                        <p><span className="text-gray-500">{localA}:</span> {pt.x}</p>
+                        <p><span className="text-gray-500">{localB}:</span> {pt.y}</p>
+                        <div className="mt-2 pt-1.5 border-t border-gray-100 space-y-0.5">
+                          <p>
+                            <span className="text-gray-500">Cancer:</span>{' '}
+                            <span className="font-medium">{ptCancer.shortName}</span>
+                          </p>
+                          <p><span className="text-gray-500">n =</span> {data.points.length} samples</p>
+                          <p><span className="text-gray-500">Pearson r =</span> {data.r}</p>
+                          <p className={pv < 0.05 ? 'text-green-600 font-medium' : 'text-gray-500'}>
+                            {formatP(pv)}
+                          </p>
+                          {uniqueCancers.length > 1 && (
+                            <p className="text-gray-400 mt-0.5">
+                              <span className="text-gray-500">Cohorts:</span>{' '}
+                              {uniqueCancers.slice(0, 5).join(', ')}
+                              {uniqueCancers.length > 5 && `, +${uniqueCancers.length - 5} more`}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     );
                   }}

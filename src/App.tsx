@@ -15,6 +15,7 @@ import ClinicalTrials from './components/ClinicalTrials';
 import SurvivalAnalysis from './components/SurvivalAnalysis';
 import MutationLandscape from './components/MutationLandscape';
 import ImmuneInfiltration from './components/ImmuneInfiltration';
+import SignatureExplorer from './components/SignatureExplorer';
 import TumorBoard from './components/TumorBoard';
 import InvestigatorRegistry from './components/InvestigatorRegistry';
 import OmicsRegistry from './components/OmicsRegistry';
@@ -25,6 +26,7 @@ type Tab =
   | 'survival'
   | 'mutations'
   | 'immune'
+  | 'signature'
   | 'hypothesis'
   | 'virtuallab'
   | 'manuscript'
@@ -53,6 +55,7 @@ export default function App() {
     { id: 'survival',       label: '📉 KM Survival' },
     { id: 'mutations',      label: '🧬 Mutations' },
     { id: 'immune',         label: '🛡️ Immune' },
+    { id: 'signature',      label: '🧩 Signature' },
     { id: 'drugs',          label: '💊 Drug Predictor' },
     { id: 'tumorboard',     label: '🏥 Tumor Board' },
     { id: 'trials',         label: '🔬 Clinical Trials' },
@@ -197,6 +200,9 @@ export default function App() {
           )}
           {activeTab === 'immune' && (
             <ImmuneInfiltration geneA={geneA} geneB={geneB} cancerType={cancerType} />
+          )}
+          {activeTab === 'signature' && (
+            <SignatureExplorer geneA={geneA} geneB={geneB} cancerType={cancerType} />
           )}
           {activeTab === 'tumorboard' && (
             <TumorBoard geneA={geneA} geneB={geneB} cancerType={cancerType} />

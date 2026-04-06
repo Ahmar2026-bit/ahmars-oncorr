@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   BarChart,
   Bar,
@@ -43,7 +44,14 @@ interface HeatmapSpec {
   type: 'heatmap';
   title?: string;
   genes: string[];
-  data: { row: string; col: string; value: number }[];
+  data: {
+    row: string;
+    col: string;
+    value: number;
+    pValue?: number;
+    sampleSize?: number;
+    cancerTypes?: string[];
+  }[];
 }
 
 type ChartSpec = BarSpec | LineSpec | ScatterSpec | HeatmapSpec;
@@ -65,6 +73,14 @@ function heatColor(norm: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
+/* ── Helpers ────────────────────────────────────────────────────────────── */
+
+function formatP(p: number): string {
+  if (p < 0.001) return 'p < 0.001';
+  if (p < 0.01) return `p = ${p.toFixed(3)}`;
+  return `p = ${p.toFixed(3)}`;
+}
+
 /* ── Heatmap sub-component ──────────────────────────────────────────────── */
 
 function HeatmapChart({ spec }: { spec: HeatmapSpec }) {
@@ -74,6 +90,17 @@ function HeatmapChart({ spec }: { spec: HeatmapSpec }) {
   const max = Math.max(...values);
   const norm = (v: number) => (max === min ? 0.5 : (v - min) / (max - min));
   const cellPx = Math.max(28, Math.min(44, Math.floor(220 / Math.max(genes.length, 1))));
+
+  const [tooltip, setTooltip] = useState<{
+    row: string;
+    col: string;
+    value: number;
+    pValue?: number;
+    sampleSize?: number;
+    cancerTypes?: string[];
+    top: number;
+    left: number;
+  } | null>(null);
 
   return (
     <div className="my-2">
@@ -113,7 +140,6 @@ function HeatmapChart({ spec }: { spec: HeatmapSpec }) {
                 {genes.map((col) => {
                   const cell = data.find((d) => d.row === row && d.col === col);
                   const v = cell?.value ?? 0;
-                  const label = typeof v === 'number' ? v.toFixed(2) : String(v);
                   return (
                     <td
                       key={col}
@@ -122,8 +148,22 @@ function HeatmapChart({ spec }: { spec: HeatmapSpec }) {
                         height: cellPx,
                         backgroundColor: heatColor(norm(v)),
                         border: '1px solid rgba(255,255,255,0.6)',
+                        cursor: 'default',
                       }}
-                      title={`${row} × ${col}: ${label}`}
+                      onMouseEnter={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setTooltip({
+                          row,
+                          col,
+                          value: v,
+                          pValue: cell?.pValue,
+                          sampleSize: cell?.sampleSize,
+                          cancerTypes: cell?.cancerTypes,
+                          top: rect.bottom + 4,
+                          left: rect.left,
+                        });
+                      }}
+                      onMouseLeave={() => setTooltip(null)}
                     />
                   );
                 })}
@@ -145,6 +185,38 @@ function HeatmapChart({ spec }: { spec: HeatmapSpec }) {
         />
         <span className="text-xs text-gray-400">{max.toFixed(2)}</span>
       </div>
+      {/* Rich hover tooltip */}
+      {tooltip && (
+        <div
+          className="fixed z-50 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg text-xs pointer-events-none"
+          style={{ top: tooltip.top, left: tooltip.left }}
+        >
+          <p className="font-semibold text-gray-800">
+            {tooltip.row} × {tooltip.col}
+          </p>
+          <p className="mt-0.5">
+            <span className="text-gray-500">Value:</span>{' '}
+            <span className="font-mono font-medium">{tooltip.value.toFixed(2)}</span>
+          </p>
+          {tooltip.pValue !== undefined && (
+            <p className={tooltip.pValue < 0.05 ? 'text-green-600 font-medium' : 'text-gray-500'}>
+              {formatP(tooltip.pValue)}
+            </p>
+          )}
+          {tooltip.sampleSize !== undefined && (
+            <p>
+              <span className="text-gray-500">n =</span> {tooltip.sampleSize} samples
+            </p>
+          )}
+          {tooltip.cancerTypes && tooltip.cancerTypes.length > 0 && (
+            <p>
+              <span className="text-gray-500">Cohorts:</span>{' '}
+              {tooltip.cancerTypes.slice(0, 5).join(', ')}
+              {tooltip.cancerTypes.length > 5 && `, +${tooltip.cancerTypes.length - 5} more`}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
