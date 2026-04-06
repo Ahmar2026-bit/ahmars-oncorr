@@ -19,11 +19,26 @@ export interface AIResponse {
   model?: string;
 }
 
+const CHART_FENCE = '```';
 const SYSTEM_PROMPT =
   'You are OncoCorr, an expert oncology & multi-omics research assistant. ' +
   'Provide concise, evidence-based answers about genes, cancer biology, ' +
   'biomarkers, pathway analysis, and clinical correlations. ' +
-  'Use markdown formatting with **bold** for key terms.';
+  'Use markdown formatting with **bold** for key terms.\n\n' +
+  'IMPORTANT — When the user asks for a chart, graph, heatmap, plot, or any visualization, ' +
+  'you MUST respond with a special fenced code block that the app renders as a real interactive chart. ' +
+  'Do NOT say you cannot make charts or graphs. Instead output:\n' +
+  CHART_FENCE + 'chart\n' +
+  '{"type":"bar","title":"Title","xLabel":"X axis","yLabel":"Y axis","data":[{"name":"Gene A","value":8.2}]}\n' +
+  CHART_FENCE + '\n' +
+  'Supported types and their required data shapes:\n' +
+  '• "bar"     — data: [{"name":"Label","value":0}, ...]\n' +
+  '• "line"    — data: [{"name":"Label","value":0}, ...]\n' +
+  '• "scatter" — data: [{"x":0,"y":0}, ...]\n' +
+  '• "heatmap" — genes: ["G1","G2",...], data: [{"row":"G1","col":"G2","value":0.75}, ...] ' +
+  '(include every row×col pair)\n' +
+  'Always fill in realistic, biologically-plausible numeric values. ' +
+  'You may include explanatory text before and/or after the chart block.';
 
 const DEMO_RESPONSES: Record<string, string> = {
   default: `**[Demo Mode — no API key configured]**
@@ -96,7 +111,7 @@ async function queryOpenAICompat(
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: prompt },
       ],
-      max_tokens: 1024,
+      max_tokens: 2048,
       temperature: 0.4,
     }),
   });
@@ -117,7 +132,7 @@ async function queryGroq(prompt: string): Promise<string> {
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: prompt },
     ],
-    max_tokens: 1024,
+    max_tokens: 2048,
     temperature: 0.4,
   });
   const text = completion.choices[0]?.message?.content;
@@ -141,7 +156,7 @@ async function queryGemini(prompt: string): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${prompt}` }] }],
-      generationConfig: { maxOutputTokens: 1024, temperature: 0.4 },
+      generationConfig: { maxOutputTokens: 2048, temperature: 0.4 },
     }),
   });
   if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
