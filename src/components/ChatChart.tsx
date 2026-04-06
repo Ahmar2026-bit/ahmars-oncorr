@@ -48,7 +48,7 @@ interface HeatmapSpec {
 
 type ChartSpec = BarSpec | LineSpec | ScatterSpec | HeatmapSpec;
 
-/* ── Colour helpers ─────────────────────────────────────────────────────── */
+/* ── Color helpers ──────────────────────────────────────────────────────── */
 
 /** Blue → White → Red diverging scale (norm ∈ [0,1]) */
 function heatColor(norm: number): string {
