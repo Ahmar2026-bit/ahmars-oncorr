@@ -16,6 +16,7 @@ import SurvivalAnalysis from './components/SurvivalAnalysis';
 import MutationLandscape from './components/MutationLandscape';
 import ImmuneInfiltration from './components/ImmuneInfiltration';
 import SignatureExplorer from './components/SignatureExplorer';
+import TranscriptionalRegulation from './components/TranscriptionalRegulation';
 import TumorBoard from './components/TumorBoard';
 import InvestigatorRegistry from './components/InvestigatorRegistry';
 import OmicsRegistry from './components/OmicsRegistry';
@@ -27,6 +28,7 @@ type Tab =
   | 'mutations'
   | 'immune'
   | 'signature'
+  | 'txreg'
   | 'hypothesis'
   | 'virtuallab'
   | 'manuscript'
@@ -56,6 +58,7 @@ export default function App() {
     { id: 'mutations',      label: '🧬 Mutations' },
     { id: 'immune',         label: '🛡️ Immune' },
     { id: 'signature',      label: '🧩 Signature' },
+    { id: 'txreg',          label: '🧬 TF Regulation' },
     { id: 'drugs',          label: '💊 Drug Predictor' },
     { id: 'tumorboard',     label: '🏥 Tumor Board' },
     { id: 'trials',         label: '🔬 Clinical Trials' },
@@ -203,6 +206,9 @@ export default function App() {
           )}
           {activeTab === 'signature' && (
             <SignatureExplorer geneA={geneA} geneB={geneB} cancerType={cancerType} />
+          )}
+          {activeTab === 'txreg' && (
+            <TranscriptionalRegulation geneA={geneA} geneB={geneB} cancerType={cancerType} />
           )}
           {activeTab === 'tumorboard' && (
             <TumorBoard geneA={geneA} geneB={geneB} cancerType={cancerType} />
