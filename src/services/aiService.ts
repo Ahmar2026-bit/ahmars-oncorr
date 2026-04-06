@@ -198,6 +198,9 @@ async function queryOllama(prompt: string): Promise<string> {
 export async function askAI(prompt: string): Promise<AIResponse> {
   const env = import.meta.env;
   const selected = getSelectedProvider();
+  // Track errors from providers that had a key configured but failed.
+  // This lets us surface the actual error instead of silently falling to demo mode.
+  const configuredErrors: { provider: string; message: string }[] = [];
 
   // Helper: try a specific provider and return its result (throws on failure)
   async function tryProvider(provider: AIProvider): Promise<AIResponse | null> {
@@ -230,7 +233,9 @@ export async function askAI(prompt: string): Promise<AIResponse> {
       const result = await tryProvider(selected as AIProvider);
       if (result) return result;
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       console.warn(`Selected provider (${selected}) failed:`, e);
+      configuredErrors.push({ provider: selected, message: msg });
     }
   }
 
@@ -242,8 +247,30 @@ export async function askAI(prompt: string): Promise<AIResponse> {
       const result = await tryProvider(provider);
       if (result) return result;
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       console.warn(`${provider} failed:`, e);
+      configuredErrors.push({ provider, message: msg });
     }
+  }
+
+  // If any configured provider was tried but failed, surface the errors so the
+  // user can see what went wrong instead of silently falling to demo content.
+  if (configuredErrors.length > 0) {
+    const details = configuredErrors
+      .map((err) => `- **${err.provider}**: \`${err.message}\``)
+      .join('\n');
+    return {
+      text:
+        `⚠️ **API key found but request failed**\n\n` +
+        `Your API key was detected but the call to the provider returned an error:\n\n` +
+        `${details}\n\n` +
+        `**Common causes:**\n` +
+        `- The key is invalid or has expired — generate a new one from the provider dashboard\n` +
+        `- The key was pasted with extra spaces — try entering it again via ⚙ Settings\n` +
+        `- Rate limit reached — wait a moment and try again\n` +
+        `- Network/CORS issue — try a different provider`,
+      provider: 'demo',
+    };
   }
 
   return { text: getDemoResponse(prompt), provider: 'demo' };
