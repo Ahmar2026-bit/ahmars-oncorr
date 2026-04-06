@@ -9,8 +9,25 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { TrendingUp, RefreshCw, ChevronDown } from 'lucide-react';
+import { TrendingUp, RefreshCw, ChevronDown, Download, Settings2 } from 'lucide-react';
 import { CANCER_TYPES, getCancerById } from '../data/cancerTypes';
+
+interface CorrelationPoint {
+  x: number;
+  y: number;
+  sample: string;
+}
+
+const PALETTES = {
+  ocean:    { fill: '#0ea5e9', label: '🔵 Ocean Blue' },
+  crimson:  { fill: '#ef4444', label: '🔴 Crimson' },
+  emerald:  { fill: '#10b981', label: '🟢 Emerald' },
+  violet:   { fill: '#8b5cf6', label: '🟣 Violet' },
+  contrast: { fill: '#1a1a2e', label: '⚫ High Contrast' },
+  cb:       { fill: '#e69f00', label: '🟡 Colorblind-safe' },
+} as const;
+
+type PaletteKey = keyof typeof PALETTES;
 
 interface CorrelationPoint {
   x: number;
@@ -83,6 +100,9 @@ export default function GeneCorrelation({
   const [localA, setLocalA] = useState(geneA);
   const [localB, setLocalB] = useState(geneB);
   const [data, setData] = useState<{ points: CorrelationPoint[]; r: number } | null>(null);
+  const [pointSize, setPointSize] = useState(4);
+  const [palette, setPalette] = useState<PaletteKey>('ocean');
+  const [showControls, setShowControls] = useState(false);
 
   function analyse() {
     const a = localA.trim().toUpperCase();
@@ -92,6 +112,24 @@ export default function GeneCorrelation({
     setData(result);
     onGenesChange(a, b);
     onCorrelation(result.r);
+  }
+
+  function downloadCSV() {
+    if (!data) return;
+    const lines = [
+      `# OncoCorr export — ${localA} vs ${localB} · ${cancerType} · Pearson r = ${data.r}`,
+      `sample,${localA}_expression,${localB}_expression`,
+      ...data.points.map((p) => `${p.sample},${p.x},${p.y}`),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `oncorr_${localA}_${localB}_${cancerType}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   const label = data ? rLabel(data.r) : null;
@@ -175,16 +213,68 @@ export default function GeneCorrelation({
       {/* Chart */}
       {data && (
         <>
-          {/* Pearson r badge */}
+          {/* Pearson r badge + actions */}
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-sm font-mono font-semibold">
               Pearson r = <span className={label!.color}>{data.r}</span>
             </span>
             <span className={`text-xs font-medium ${label!.color}`}>{label!.text}</span>
-            <span className="text-xs text-gray-400 ml-auto">
-              Synthetic TCGA-like data · {cancer.shortName} · {data.points.length} samples
+            <span className="text-xs text-gray-400">
+              Synthetic TCGA-like · {cancer.shortName} · {data.points.length} samples
             </span>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => setShowControls((v) => !v)}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600"
+                title="Chart options"
+              >
+                <Settings2 size={12} />
+                Options
+              </button>
+              <button
+                onClick={downloadCSV}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600"
+                title="Download CSV"
+              >
+                <Download size={12} />
+                CSV
+              </button>
+            </div>
           </div>
+
+          {/* Chart controls panel */}
+          {showControls && (
+            <div className="flex flex-wrap items-center gap-4 p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs">
+              <div className="flex items-center gap-2">
+                <label className="font-medium text-gray-600">Point size</label>
+                <input
+                  type="range"
+                  min={2}
+                  max={10}
+                  step={1}
+                  value={pointSize}
+                  onChange={(e) => setPointSize(Number(e.target.value))}
+                  className="w-20 accent-brand-600"
+                />
+                <span className="text-gray-500 w-4">{pointSize}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="font-medium text-gray-600">Color</label>
+                <div className="relative">
+                  <select
+                    value={palette}
+                    onChange={(e) => setPalette(e.target.value as PaletteKey)}
+                    className="appearance-none border border-gray-300 rounded-md pl-2 pr-6 py-1 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+                  >
+                    {(Object.entries(PALETTES) as [PaletteKey, { fill: string; label: string }][]).map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={11} className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -226,7 +316,12 @@ export default function GeneCorrelation({
                     { x: Math.max(...data.points.map((d) => d.x)), y: data.r * Math.max(...data.points.map((d) => d.x)) + 1 },
                   ]}
                 />
-                <Scatter data={data.points} fill="#0ea5e9" fillOpacity={0.65} r={4} />
+                <Scatter
+                  data={data.points}
+                  fill={PALETTES[palette].fill}
+                  fillOpacity={0.65}
+                  r={pointSize}
+                />
               </ScatterChart>
             </ResponsiveContainer>
           </div>

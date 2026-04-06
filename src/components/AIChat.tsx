@@ -1,15 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User } from 'lucide-react';
+import { Send, Bot, User, BookOpen, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { askAI, type AIProvider } from '../services/aiService';
+import { searchPubMed, type PubMedArticle } from '../services/pubmedService';
 import { renderMarkdown } from '../utils/markdown';
 import ProviderBadge from './ProviderBadge';
 import ChatChart from './ChatChart';
 
 interface Message {
+  id: number;
   role: 'user' | 'assistant';
   content: string;
   provider?: AIProvider;
+  references?: PubMedArticle[];
+  refsLoading?: boolean;
 }
+
+const GROUNDING_QUERY_MAX_CHARS = 200;
+const GROUNDING_DOMAIN_SUFFIX = ' cancer oncology';
 
 type ContentPart = { type: 'text'; content: string } | { type: 'chart'; content: string };
 
@@ -35,7 +42,9 @@ export default function AIChat({ geneA, geneB }: { geneA: string; geneB: string 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [openRefs, setOpenRefs] = useState<Set<number>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
+  const msgIdRef = useRef(0);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -52,19 +61,46 @@ export default function AIChat({ geneA, geneB }: { geneA: string; geneB: string 
     const text = input.trim();
     if (!text || loading) return;
     setInput('');
-    const userMsg: Message = { role: 'user', content: text };
+
+    const userId = msgIdRef.current++;
+    const userMsg: Message = { id: userId, role: 'user', content: text };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
+
     try {
       const response = await askAI(text);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: response.text, provider: response.provider },
-      ]);
+      const assistantId = msgIdRef.current++;
+      const assistantMsg: Message = {
+        id: assistantId,
+        role: 'assistant',
+        content: response.text,
+        provider: response.provider,
+        refsLoading: true,
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+
+      // Fetch grounding references in background
+      searchPubMed(text.slice(0, GROUNDING_QUERY_MAX_CHARS) + GROUNDING_DOMAIN_SUFFIX, 5)
+        .then((refs) => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, references: refs, refsLoading: false } : m,
+            ),
+          );
+        })
+        .catch(() => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, refsLoading: false } : m,
+            ),
+          );
+        });
     } catch {
+      const errId = msgIdRef.current++;
       setMessages((prev) => [
         ...prev,
         {
+          id: errId,
           role: 'assistant',
           content: '⚠️ Failed to get a response. Please check your API key configuration.',
           provider: 'demo',
@@ -130,6 +166,55 @@ export default function AIChat({ geneA, geneB }: { geneA: string; geneB: string 
                   ),
                 )}
               </div>
+
+              {/* Grounding References */}
+              {msg.role === 'assistant' && (msg.refsLoading || (msg.references && msg.references.length > 0)) && (
+                <div className="w-full mt-1">
+                  <button
+                    onClick={() =>
+                      setOpenRefs((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(msg.id)) next.delete(msg.id);
+                        else next.add(msg.id);
+                        return next;
+                      })
+                    }
+                    className="flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium"
+                  >
+                    <BookOpen size={11} />
+                    {msg.refsLoading
+                      ? 'Loading grounding references…'
+                      : `📚 ${msg.references!.length} grounding reference${msg.references!.length !== 1 ? 's' : ''}`}
+                    {!msg.refsLoading && (
+                      openRefs.has(msg.id) ? <ChevronUp size={11} /> : <ChevronDown size={11} />
+                    )}
+                  </button>
+
+                  {!msg.refsLoading && openRefs.has(msg.id) && msg.references && (
+                    <div className="mt-1.5 space-y-1.5 pl-2 border-l-2 border-brand-200">
+                      {msg.references.map((ref) => (
+                        <a
+                          key={ref.pmid}
+                          href={ref.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-start gap-1.5 group"
+                        >
+                          <ExternalLink size={10} className="mt-0.5 flex-shrink-0 text-gray-300 group-hover:text-brand-500" />
+                          <div>
+                            <p className="text-xs text-gray-700 group-hover:text-brand-700 leading-snug">
+                              {ref.title}
+                            </p>
+                            <p className="text-[11px] text-gray-400">
+                              {ref.authors}{ref.journal ? ` · ${ref.journal}` : ''}{ref.pubDate ? ` · ${ref.pubDate}` : ''}
+                            </p>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ))}
