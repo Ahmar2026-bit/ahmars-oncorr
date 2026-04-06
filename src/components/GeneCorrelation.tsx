@@ -9,13 +9,49 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { TrendingUp, RefreshCw, ChevronDown } from 'lucide-react';
+import { TrendingUp, RefreshCw, ChevronDown, Download, Settings2 } from 'lucide-react';
 import { CANCER_TYPES, getCancerById } from '../data/cancerTypes';
 
 interface CorrelationPoint {
   x: number;
   y: number;
   sample: string;
+  cancerTypeId: string;
+}
+
+const PALETTES = {
+  ocean:    { fill: '#0ea5e9', label: '🔵 Ocean Blue' },
+  crimson:  { fill: '#ef4444', label: '🔴 Crimson' },
+  emerald:  { fill: '#10b981', label: '🟢 Emerald' },
+  violet:   { fill: '#8b5cf6', label: '🟣 Violet' },
+  contrast: { fill: '#1a1a2e', label: '⚫ High Contrast' },
+  cb:       { fill: '#e69f00', label: '🟡 Colorblind-safe' },
+} as const;
+
+type PaletteKey = keyof typeof PALETTES;
+
+const PAN_CANCER_COHORTS = [
+  'BRCA', 'LUAD', 'COAD', 'GBM', 'OV', 'KIRC', 'PRAD', 'UCEC', 'SKCM', 'STAD',
+];
+
+function normalCDF(x: number): number {
+  const ax = Math.abs(x);
+  const t = 1 / (1 + 0.2316419 * ax);
+  const d = 0.3989423 * Math.exp(-ax * ax / 2);
+  const upperTail = d * t * (0.3193815 + t * (-0.3565638 + t * (1.7814779 + t * (-1.8212560 + t * 1.3302744))));
+  return x >= 0 ? 1 - upperTail : upperTail;
+}
+
+function pValueFromR(r: number, n: number): number {
+  if (n <= 2) return 1;
+  const t = r * Math.sqrt(n - 2) / Math.sqrt(Math.max(1e-10, 1 - r * r));
+  return 2 * normalCDF(-Math.abs(t));
+}
+
+function formatP(p: number): string {
+  if (p < 0.001) return 'p < 0.001';
+  if (p < 0.01) return `p = ${p.toFixed(3)}`;
+  return `p = ${p.toFixed(3)}`;
 }
 
 function generateSyntheticData(
@@ -23,7 +59,7 @@ function generateSyntheticData(
   geneB: string,
   cancerType = 'BRCA',
   n = 60,
-): { points: CorrelationPoint[]; r: number } {
+): { points: CorrelationPoint[]; r: number; pValue: number } {
   // Deterministic seed from gene names + cancer type so results are reproducible per cohort
   const seed = [...(geneA + geneB + cancerType)].reduce((acc, c) => acc + c.charCodeAt(0), 0);
   let s = seed;
@@ -40,7 +76,11 @@ function generateSyntheticData(
     const x = rng() * 10 + 1;
     const noise = (rng() - 0.5) * (1 - Math.abs(baseR)) * 8;
     const y = baseR * x + (rng() * 3 + 1) + noise;
-    points.push({ x: +x.toFixed(2), y: +Math.max(0, y).toFixed(2), sample: `TCGA-${i + 1}` });
+    const cancerTypeId =
+      cancerType === 'PanCancer'
+        ? PAN_CANCER_COHORTS[i % PAN_CANCER_COHORTS.length]
+        : cancerType;
+    points.push({ x: +x.toFixed(2), y: +Math.max(0, y).toFixed(2), sample: `TCGA-${i + 1}`, cancerTypeId });
   }
 
   // Compute Pearson r from generated points
@@ -53,8 +93,8 @@ function generateSyntheticData(
       points.reduce((s, p) => s + (p.y - meanY) ** 2, 0),
   );
   const r = den === 0 ? 0 : num / den;
-
-  return { points, r: +r.toFixed(3) };
+  const pValue = pValueFromR(r, n2);
+  return { points, r: +r.toFixed(3), pValue };
 }
 
 function rLabel(r: number): { text: string; color: string } {
@@ -82,7 +122,10 @@ export default function GeneCorrelation({
 }) {
   const [localA, setLocalA] = useState(geneA);
   const [localB, setLocalB] = useState(geneB);
-  const [data, setData] = useState<{ points: CorrelationPoint[]; r: number } | null>(null);
+  const [data, setData] = useState<{ points: CorrelationPoint[]; r: number; pValue: number } | null>(null);
+  const [pointSize, setPointSize] = useState(4);
+  const [palette, setPalette] = useState<PaletteKey>('ocean');
+  const [showControls, setShowControls] = useState(false);
 
   function analyse() {
     const a = localA.trim().toUpperCase();
@@ -92,6 +135,24 @@ export default function GeneCorrelation({
     setData(result);
     onGenesChange(a, b);
     onCorrelation(result.r);
+  }
+
+  function downloadCSV() {
+    if (!data) return;
+    const lines = [
+      `# OncoCorr export — ${localA} vs ${localB} · ${cancerType} · Pearson r = ${data.r}`,
+      `sample,${localA}_expression,${localB}_expression`,
+      ...data.points.map((p) => `${p.sample},${p.x},${p.y}`),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `oncorr_${localA}_${localB}_${cancerType}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   const label = data ? rLabel(data.r) : null;
@@ -175,16 +236,68 @@ export default function GeneCorrelation({
       {/* Chart */}
       {data && (
         <>
-          {/* Pearson r badge */}
+          {/* Pearson r badge + actions */}
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-sm font-mono font-semibold">
               Pearson r = <span className={label!.color}>{data.r}</span>
             </span>
             <span className={`text-xs font-medium ${label!.color}`}>{label!.text}</span>
-            <span className="text-xs text-gray-400 ml-auto">
-              Synthetic TCGA-like data · {cancer.shortName} · {data.points.length} samples
+            <span className="text-xs text-gray-400">
+              Synthetic TCGA-like · {cancer.shortName} · {data.points.length} samples
             </span>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => setShowControls((v) => !v)}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600"
+                title="Chart options"
+              >
+                <Settings2 size={12} />
+                Options
+              </button>
+              <button
+                onClick={downloadCSV}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600"
+                title="Download CSV"
+              >
+                <Download size={12} />
+                CSV
+              </button>
+            </div>
           </div>
+
+          {/* Chart controls panel */}
+          {showControls && (
+            <div className="flex flex-wrap items-center gap-4 p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs">
+              <div className="flex items-center gap-2">
+                <label className="font-medium text-gray-600">Point size</label>
+                <input
+                  type="range"
+                  min={2}
+                  max={10}
+                  step={1}
+                  value={pointSize}
+                  onChange={(e) => setPointSize(Number(e.target.value))}
+                  className="w-20 accent-brand-600"
+                />
+                <span className="text-gray-500 w-4">{pointSize}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="font-medium text-gray-600">Color</label>
+                <div className="relative">
+                  <select
+                    value={palette}
+                    onChange={(e) => setPalette(e.target.value as PaletteKey)}
+                    className="appearance-none border border-gray-300 rounded-md pl-2 pr-6 py-1 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+                  >
+                    {(Object.entries(PALETTES) as [PaletteKey, { fill: string; label: string }][]).map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={11} className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -207,13 +320,34 @@ export default function GeneCorrelation({
                 <Tooltip
                   cursor={{ strokeDasharray: '3 3' }}
                   content={({ payload }) => {
-                    if (!payload?.length) return null;
-                    const p = payload[0].payload as CorrelationPoint;
+                    if (!payload?.length || !data) return null;
+                    const pt = payload[0].payload as CorrelationPoint;
+                    const ptCancer = getCancerById(pt.cancerTypeId);
+                    const pv = data.pValue;
+                    const uniqueCancers = [...new Set(data.points.map((d) => d.cancerTypeId))];
                     return (
-                      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs shadow">
-                        <p className="font-medium">{p.sample}</p>
-                        <p>{localA}: {p.x}</p>
-                        <p>{localB}: {p.y}</p>
+                      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs shadow-lg min-w-44">
+                        <p className="font-semibold text-gray-800 mb-1">{pt.sample}</p>
+                        <p><span className="text-gray-500">{localA}:</span> {pt.x}</p>
+                        <p><span className="text-gray-500">{localB}:</span> {pt.y}</p>
+                        <div className="mt-2 pt-1.5 border-t border-gray-100 space-y-0.5">
+                          <p>
+                            <span className="text-gray-500">Cancer:</span>{' '}
+                            <span className="font-medium">{ptCancer.shortName}</span>
+                          </p>
+                          <p><span className="text-gray-500">n =</span> {data.points.length} samples</p>
+                          <p><span className="text-gray-500">Pearson r =</span> {data.r}</p>
+                          <p className={pv < 0.05 ? 'text-green-600 font-medium' : 'text-gray-500'}>
+                            {formatP(pv)}
+                          </p>
+                          {uniqueCancers.length > 1 && (
+                            <p className="text-gray-400 mt-0.5">
+                              <span className="text-gray-500">Cohorts:</span>{' '}
+                              {uniqueCancers.slice(0, 5).join(', ')}
+                              {uniqueCancers.length > 5 && `, +${uniqueCancers.length - 5} more`}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     );
                   }}
@@ -226,7 +360,12 @@ export default function GeneCorrelation({
                     { x: Math.max(...data.points.map((d) => d.x)), y: data.r * Math.max(...data.points.map((d) => d.x)) + 1 },
                   ]}
                 />
-                <Scatter data={data.points} fill="#0ea5e9" fillOpacity={0.65} r={4} />
+                <Scatter
+                  data={data.points}
+                  fill={PALETTES[palette].fill}
+                  fillOpacity={0.65}
+                  r={pointSize}
+                />
               </ScatterChart>
             </ResponsiveContainer>
           </div>
