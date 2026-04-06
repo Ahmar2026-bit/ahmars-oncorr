@@ -5,16 +5,25 @@ import AIChat from './components/AIChat';
 import LiteratureSearch from './components/LiteratureSearch';
 import GEOSearch from './components/GEOSearch';
 import ProteinNetwork from './components/ProteinNetwork';
+import HypothesisValidator from './components/HypothesisValidator';
+import VirtualLab from './components/VirtualLab';
+import ManuscriptDraft from './components/ManuscriptDraft';
+import { DEFAULT_CANCER_ID } from './data/cancerTypes';
 
-type Tab = 'correlation' | 'ai' | 'literature' | 'geo' | 'network';
+type Tab = 'correlation' | 'hypothesis' | 'virtuallab' | 'manuscript' | 'ai' | 'literature' | 'geo' | 'network';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('correlation');
   const [geneA, setGeneA] = useState('');
   const [geneB, setGeneB] = useState('');
+  const [cancerType, setCancerType] = useState(DEFAULT_CANCER_ID);
+  const [correlationR, setCorrelationR] = useState<number | null>(null);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'correlation', label: '📈 Correlation' },
+    { id: 'hypothesis',  label: '🔬 Hypothesis' },
+    { id: 'virtuallab',  label: '⚗️ Virtual Lab' },
+    { id: 'manuscript',  label: '📝 Manuscript' },
     { id: 'ai',          label: '🤖 AI Analysis' },
     { id: 'literature',  label: '📚 PubMed' },
     { id: 'geo',         label: '🧬 GEO Datasets' },
@@ -49,7 +58,33 @@ export default function App() {
             <GeneCorrelation
               geneA={geneA}
               geneB={geneB}
+              cancerType={cancerType}
               onGenesChange={(a, b) => { setGeneA(a); setGeneB(b); }}
+              onCancerChange={setCancerType}
+              onCorrelation={setCorrelationR}
+            />
+          )}
+          {activeTab === 'hypothesis' && (
+            <HypothesisValidator
+              geneA={geneA}
+              geneB={geneB}
+              cancerType={cancerType}
+              correlationR={correlationR}
+            />
+          )}
+          {activeTab === 'virtuallab' && (
+            <VirtualLab
+              geneA={geneA}
+              geneB={geneB}
+              cancerType={cancerType}
+            />
+          )}
+          {activeTab === 'manuscript' && (
+            <ManuscriptDraft
+              geneA={geneA}
+              geneB={geneB}
+              cancerType={cancerType}
+              correlationR={correlationR}
             />
           )}
           {activeTab === 'ai' && <AIChat geneA={geneA} geneB={geneB} />}
