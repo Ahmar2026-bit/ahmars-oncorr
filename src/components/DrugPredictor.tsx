@@ -4,6 +4,7 @@ import { askAI } from '../services/aiService';
 import { getCancerById } from '../data/cancerTypes';
 import { renderMarkdown } from '../utils/markdown';
 import ProviderBadge from './ProviderBadge';
+import { EvidenceBadge } from './TumorBoard';
 import type { AIProvider } from '../services/aiService';
 
 interface DrugInteraction {
@@ -89,7 +90,8 @@ export default function DrugPredictor({
         `DGIdb interactions retrieved: ${topDrugs}\n\n` +
         `Please provide a drug prediction report:\n\n` +
         `## Known Targeted Therapies\n` +
-        `List FDA-approved or late-stage drugs targeting ${g}, their mechanism, and clinical indications.\n\n` +
+        `List FDA-approved or late-stage drugs targeting ${g}, their mechanism, and clinical indications. ` +
+        `For each drug, note its evidence level: (1A = FDA-approved, 1B = guideline-recommended, 2A = clinical trial evidence, 4 = preclinical).\n\n` +
         `## Predicted Drug Sensitivities\n` +
         `Based on the gene's pathway role, predict additional drug classes that may be effective.\n\n` +
         `## Resistance Mechanisms\n` +
@@ -168,6 +170,15 @@ export default function DrugPredictor({
         </a>
         {' '}— free API, no key required
       </p>
+
+      {/* Evidence level legend */}
+      <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+        <span>Evidence:</span>
+        <EvidenceBadge level="1A" />
+        <EvidenceBadge level="1B" />
+        <EvidenceBadge level="2A" />
+        <EvidenceBadge level="4" />
+      </div>
 
       {error && <p className="text-sm text-red-500 bg-red-50 p-3 rounded-lg">{error}</p>}
 

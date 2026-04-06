@@ -12,10 +12,17 @@ import ProteomicsAnalysis from './components/ProteomicsAnalysis';
 import RNASeqAnalysis from './components/RNASeqAnalysis';
 import DrugPredictor from './components/DrugPredictor';
 import ClinicalTrials from './components/ClinicalTrials';
+import SurvivalAnalysis from './components/SurvivalAnalysis';
+import MutationLandscape from './components/MutationLandscape';
+import ImmuneInfiltration from './components/ImmuneInfiltration';
+import TumorBoard from './components/TumorBoard';
 import { DEFAULT_CANCER_ID } from './data/cancerTypes';
 
 type Tab =
   | 'correlation'
+  | 'survival'
+  | 'mutations'
+  | 'immune'
   | 'hypothesis'
   | 'virtuallab'
   | 'manuscript'
@@ -26,7 +33,8 @@ type Tab =
   | 'proteomics'
   | 'rnaseq'
   | 'drugs'
-  | 'trials';
+  | 'trials'
+  | 'tumorboard';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('correlation');
@@ -36,18 +44,22 @@ export default function App() {
   const [correlationR, setCorrelationR] = useState<number | null>(null);
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'correlation', label: '📈 Correlation' },
-    { id: 'hypothesis',  label: '🔬 Hypothesis' },
-    { id: 'virtuallab',  label: '⚗️ Virtual Lab' },
-    { id: 'manuscript',  label: '📝 Manuscript' },
-    { id: 'ai',          label: '🤖 AI Analysis' },
-    { id: 'literature',  label: '📚 PubMed' },
-    { id: 'geo',         label: '🧬 GEO Datasets' },
-    { id: 'network',     label: '🔗 Protein Network' },
-    { id: 'proteomics',  label: '🔭 Proteomics' },
-    { id: 'rnaseq',      label: '📊 RNA-seq' },
-    { id: 'drugs',       label: '💊 Drug Predictor' },
-    { id: 'trials',      label: '🏥 Clinical Trials' },
+    { id: 'correlation',  label: '📈 Correlation' },
+    { id: 'survival',     label: '📉 KM Survival' },
+    { id: 'mutations',    label: '🧬 Mutations' },
+    { id: 'immune',       label: '🛡️ Immune' },
+    { id: 'drugs',        label: '💊 Drug Predictor' },
+    { id: 'tumorboard',   label: '🏥 Tumor Board' },
+    { id: 'trials',       label: '🔬 Clinical Trials' },
+    { id: 'hypothesis',   label: '💡 Hypothesis' },
+    { id: 'virtuallab',   label: '⚗️ Virtual Lab' },
+    { id: 'manuscript',   label: '📝 Manuscript' },
+    { id: 'ai',           label: '🤖 AI Analysis' },
+    { id: 'literature',   label: '📚 PubMed' },
+    { id: 'geo',          label: '🗄️ GEO Datasets' },
+    { id: 'network',      label: '🔗 Protein Network' },
+    { id: 'proteomics',   label: '🔭 Proteomics' },
+    { id: 'rnaseq',       label: '📊 RNA-seq' },
   ];
 
   return (
@@ -128,6 +140,18 @@ export default function App() {
           )}
           {activeTab === 'trials' && (
             <ClinicalTrials geneA={geneA} geneB={geneB} cancerType={cancerType} />
+          )}
+          {activeTab === 'survival' && (
+            <SurvivalAnalysis geneA={geneA} geneB={geneB} cancerType={cancerType} />
+          )}
+          {activeTab === 'mutations' && (
+            <MutationLandscape geneA={geneA} geneB={geneB} cancerType={cancerType} />
+          )}
+          {activeTab === 'immune' && (
+            <ImmuneInfiltration geneA={geneA} geneB={geneB} cancerType={cancerType} />
+          )}
+          {activeTab === 'tumorboard' && (
+            <TumorBoard geneA={geneA} geneB={geneB} cancerType={cancerType} />
           )}
         </div>
 
