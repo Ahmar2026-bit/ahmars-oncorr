@@ -56,6 +56,24 @@ a live LLM analysing your specific query.
 
 Add any key to your \`.env.local\` file, or click the **⚙ Settings** button in the header to enter a key directly in your browser.`,
 
+  invalid_key: `**[Demo Mode — API key rejected]**
+
+Your API key was rejected by the provider (authentication error). This usually means:
+- The key has been **revoked** (keys exposed in public repositories are auto-revoked by providers)
+- The key has **expired** or been regenerated
+- The key was entered **incorrectly**
+
+**To fix this:**
+1. Click the **⚙ Settings** button above
+2. Delete the existing key(s)
+3. Generate a **new key** from the provider's dashboard
+4. Enter the new key and click **Save Keys**
+
+**Get a free key (no credit card required):**
+- **Groq** — [console.groq.com](https://console.groq.com/keys) → free 14,400 req/day
+- **Gemini** — [aistudio.google.com](https://aistudio.google.com/apikey) → 1M tokens/day free
+- **OpenRouter** — [openrouter.ai/keys](https://openrouter.ai/keys) → free models available`,
+
   tp53_brca1: `**TP53 & BRCA1 — Oncology Context**
 
 Both genes are critical tumour suppressors frequently co-mutated in high-grade
@@ -195,9 +213,24 @@ async function queryOllama(prompt: string): Promise<string> {
   return data.response as string;
 }
 
+/** Returns true when the error is an authentication / authorisation failure. */
+function isAuthError(e: unknown): boolean {
+  const msg = String(e).toLowerCase();
+  return (
+    msg.includes('401') ||
+    msg.includes('403') ||
+    msg.includes('unauthorized') ||
+    msg.includes('invalid api key') ||
+    msg.includes('authentication') ||
+    msg.includes('permission_denied') ||
+    msg.includes('api_key_invalid')
+  );
+}
+
 export async function askAI(prompt: string): Promise<AIResponse> {
   const env = import.meta.env;
   const selected = getSelectedProvider();
+  let authFailed = false;
 
   // Helper: try a specific provider and return its result (throws on failure)
   async function tryProvider(provider: AIProvider): Promise<AIResponse | null> {
@@ -230,6 +263,7 @@ export async function askAI(prompt: string): Promise<AIResponse> {
       const result = await tryProvider(selected as AIProvider);
       if (result) return result;
     } catch (e) {
+      if (isAuthError(e)) authFailed = true;
       console.warn(`Selected provider (${selected}) failed:`, e);
     }
   }
@@ -242,11 +276,76 @@ export async function askAI(prompt: string): Promise<AIResponse> {
       const result = await tryProvider(provider);
       if (result) return result;
     } catch (e) {
+      if (isAuthError(e)) authFailed = true;
       console.warn(`${provider} failed:`, e);
     }
   }
 
+  if (authFailed) return { text: DEMO_RESPONSES.invalid_key, provider: 'demo' };
   return { text: getDemoResponse(prompt), provider: 'demo' };
+}
+
+/**
+ * Tests a single provider with the given key by sending a short probe request.
+ * Returns 'ok' on success, 'auth' when the key is rejected, or 'error' for
+ * other failures (network, quota, etc.).
+ */
+export async function testProviderKey(
+  provider: keyof import('./settingsService').ApiKeys,
+  apiKey: string,
+): Promise<'ok' | 'auth' | 'error'> {
+  const probe = 'Reply with exactly one word: ready';
+  try {
+    switch (provider) {
+      case 'groq': {
+        const client = new Groq({ apiKey, dangerouslyAllowBrowser: true });
+        await client.chat.completions.create({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: probe }],
+          max_tokens: 5,
+        });
+        break;
+      }
+      case 'deepseek':
+        await queryOpenAICompat('https://api.deepseek.com/v1', apiKey, 'deepseek-chat', probe);
+        break;
+      case 'gemini': {
+        const geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+        const geminiBody = JSON.stringify({
+          contents: [{ parts: [{ text: probe }] }],
+          generationConfig: { maxOutputTokens: 5 },
+        });
+        const res = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: geminiBody,
+        });
+        if (!res.ok) {
+          const body = await res.text();
+          if (res.status === 400 && body.includes('API_KEY_INVALID')) return 'auth';
+          if (res.status === 401 || res.status === 403) return 'auth';
+          return 'error';
+        }
+        break;
+      }
+      case 'openrouter':
+        await queryOpenAICompat(
+          'https://openrouter.ai/api/v1',
+          apiKey,
+          'meta-llama/llama-3.1-8b-instruct:free',
+          probe,
+          { 'HTTP-Referer': 'https://oncorr.app', 'X-Title': 'OncoCorr' },
+        );
+        break;
+    }
+    return 'ok';
+  } catch (e) {
+    if (isAuthError(e)) return 'auth';
+    return 'error';
+  }
 }
 
 export function activeProvider(): AIProvider {

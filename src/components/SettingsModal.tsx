@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Key, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { X, Key, ExternalLink, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { getStoredApiKeys, saveApiKeys, getSelectedProvider, saveSelectedProvider, type ApiKeys } from '../services/settingsService';
+import { testProviderKey } from '../services/aiService';
 
 interface Props {
   onClose: () => void;
@@ -53,11 +54,22 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
   const [keys, setKeys] = useState<ApiKeys>({ groq: '', deepseek: '', gemini: '', openrouter: '' });
   const [selectedProvider, setSelectedProvider] = useState<string>('auto');
   const [saved, setSaved] = useState(false);
+  const [testState, setTestState] = useState<Record<string, 'idle' | 'testing' | 'ok' | 'auth' | 'error'>>({
+    groq: 'idle', deepseek: 'idle', gemini: 'idle', openrouter: 'idle',
+  });
 
   useEffect(() => {
     setKeys(getStoredApiKeys());
     setSelectedProvider(getSelectedProvider());
   }, []);
+
+  async function handleTest(providerId: keyof ApiKeys) {
+    const key = keys[providerId].trim();
+    if (!key) return;
+    setTestState((prev) => ({ ...prev, [providerId]: 'testing' }));
+    const result = await testProviderKey(providerId, key);
+    setTestState((prev) => ({ ...prev, [providerId]: result }));
+  }
 
   // Providers that already have a key entered (in local form state)
   const configuredProviders = PROVIDERS.filter((p) => keys[p.id].trim().length > 0);
@@ -110,15 +122,53 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
                   {p.helpLabel} <ExternalLink size={10} />
                 </a>
               </div>
-              <input
-                type="password"
-                autoComplete="off"
-                placeholder={p.placeholder}
-                value={keys[p.id]}
-                onChange={(e) => setKeys((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent font-mono"
-              />
-              <p className="text-xs text-gray-400 mt-0.5">{p.note}</p>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="password"
+                  autoComplete="off"
+                  placeholder={p.placeholder}
+                  value={keys[p.id]}
+                  onChange={(e) => {
+                    setKeys((prev) => ({ ...prev, [p.id]: e.target.value }));
+                    setTestState((prev) => ({ ...prev, [p.id]: 'idle' }));
+                  }}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent font-mono"
+                />
+                {keys[p.id].trim() && (
+                  <button
+                    type="button"
+                    onClick={() => handleTest(p.id)}
+                    disabled={testState[p.id] === 'testing'}
+                    title="Test this API key"
+                    className="flex-shrink-0 px-2.5 py-2 text-xs font-medium border rounded-lg transition-colors disabled:opacity-50
+                      border-gray-300 text-gray-600 hover:border-brand-400 hover:text-brand-600"
+                  >
+                    {testState[p.id] === 'testing' ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : testState[p.id] === 'ok' ? (
+                      <CheckCircle2 size={14} className="text-green-600" />
+                    ) : testState[p.id] === 'auth' ? (
+                      <AlertCircle size={14} className="text-red-500" />
+                    ) : testState[p.id] === 'error' ? (
+                      <AlertCircle size={14} className="text-yellow-500" />
+                    ) : (
+                      'Test'
+                    )}
+                  </button>
+                )}
+              </div>
+              {testState[p.id] === 'ok' && (
+                <p className="text-xs text-green-600 mt-0.5">✓ Key is valid and working</p>
+              )}
+              {testState[p.id] === 'auth' && (
+                <p className="text-xs text-red-500 mt-0.5">✗ Key rejected — invalid or revoked. Please generate a new key.</p>
+              )}
+              {testState[p.id] === 'error' && (
+                <p className="text-xs text-yellow-600 mt-0.5">⚠ Could not verify key (network error or quota issue). Try saving and using it.</p>
+              )}
+              {testState[p.id] === 'idle' && (
+                <p className="text-xs text-gray-400 mt-0.5">{p.note}</p>
+              )}
             </div>
           ))}
 
