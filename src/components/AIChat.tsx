@@ -95,14 +95,15 @@ export default function AIChat({ geneA, geneB }: { geneA: string; geneB: string 
             ),
           );
         });
-    } catch {
+    } catch (err) {
       const errId = msgIdRef.current++;
+      const detail = err instanceof Error ? err.message : 'Unknown error';
       setMessages((prev) => [
         ...prev,
         {
           id: errId,
           role: 'assistant',
-          content: '⚠️ Failed to get a response. Please check your API key configuration.',
+          content: `⚠️ ${detail}\n\nOpen **⚙ Settings** to verify your API key or try a different provider.`,
           provider: 'demo',
         },
       ]);
