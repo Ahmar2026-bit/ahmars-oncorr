@@ -11,7 +11,7 @@ import {
   Cell,
 } from 'recharts';
 import { BarChart2, Loader2, TrendingUp } from 'lucide-react';
-import { askAI } from '../services/aiService';
+import { askAI, activeProvider } from '../services/aiService';
 import { getCancerById } from '../data/cancerTypes';
 import { renderMarkdown } from '../utils/markdown';
 import ProviderBadge from './ProviderBadge';
@@ -66,7 +66,7 @@ export default function RNASeqAnalysis({
     geneA && geneB ? `${geneA}, ${geneB}` : geneA || ''
   );
   const [aiText, setAiText] = useState('');
-  const [aiProvider, setAiProvider] = useState<AIProvider>('demo');
+  const [aiProvider, setAiProvider] = useState<AIProvider>(activeProvider);
   const [volcanoData, setVolcanoData] = useState<VolcanoPoint[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

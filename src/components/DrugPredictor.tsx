@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pill, Loader2, ExternalLink, AlertCircle, CheckCircle, Database } from 'lucide-react';
-import { askAI } from '../services/aiService';
+import { askAI, activeProvider } from '../services/aiService';
 import { getCancerById } from '../data/cancerTypes';
 import { renderMarkdown } from '../utils/markdown';
 import ProviderBadge from './ProviderBadge';
@@ -55,7 +55,7 @@ export default function DrugPredictor({
   const [gene, setGene] = useState(geneA || '');
   const [dgiResults, setDgiResults] = useState<DGIdbResult | null>(null);
   const [aiText, setAiText] = useState('');
-  const [aiProvider, setAiProvider] = useState<AIProvider>('demo');
+  const [aiProvider, setAiProvider] = useState<AIProvider>(activeProvider);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);

@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { Layers, Loader2, AlertCircle, Info, Download, RefreshCw } from 'lucide-react';
 import { getCancerById } from '../data/cancerTypes';
-import { askAI } from '../services/aiService';
+import { askAI, activeProvider } from '../services/aiService';
 import { renderMarkdown } from '../utils/markdown';
 import ProviderBadge from './ProviderBadge';
 import type { AIProvider } from '../services/aiService';
@@ -227,7 +227,7 @@ export default function SignatureExplorer({
   const [matrix, setMatrix] = useState<GeneMatrix | null>(null);
   const [sigData, setSigData] = useState<SignatureData | null>(null);
   const [aiText, setAiText] = useState('');
-  const [aiProvider, setAiProvider] = useState<AIProvider>('demo');
+  const [aiProvider, setAiProvider] = useState<AIProvider>(activeProvider);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [analysed, setAnalysed] = useState(false);
