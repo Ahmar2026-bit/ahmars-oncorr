@@ -195,9 +195,91 @@ async function queryOllama(prompt: string): Promise<string> {
   return data.response as string;
 }
 
+/** Result returned by {@link testProvider}. */
+export interface ProviderTestResult {
+  ok: boolean;
+  /** Human-readable error message when ok is false. */
+  error?: string;
+}
+
+/**
+ * Test a provider key by sending a minimal prompt.
+ * Uses the key supplied in the argument (not the saved localStorage key),
+ * so callers can test before saving.
+ */
+export async function testProvider(
+  provider: keyof import('./settingsService').ApiKeys | 'ollama',
+  key: string,
+): Promise<ProviderTestResult> {
+  const TEST_PROMPT = 'Reply with a single word: OK';
+  try {
+    switch (provider) {
+      case 'groq': {
+        const client = new Groq({ apiKey: key, dangerouslyAllowBrowser: true });
+        const c = await client.chat.completions.create({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: TEST_PROMPT }],
+          max_tokens: 10,
+          temperature: 0,
+        });
+        if (!c.choices[0]?.message?.content) throw new Error('Empty response');
+        break;
+      }
+      case 'deepseek':
+        await queryOpenAICompat('https://api.deepseek.com/v1', key, 'deepseek-chat', TEST_PROMPT);
+        break;
+      case 'gemini': {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: TEST_PROMPT }] }],
+            generationConfig: { maxOutputTokens: 10 },
+          }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+        break;
+      }
+      case 'openrouter':
+        await queryOpenAICompat(
+          'https://openrouter.ai/api/v1',
+          key,
+          'meta-llama/llama-3.1-8b-instruct:free',
+          TEST_PROMPT,
+          { 'HTTP-Referer': 'https://oncorr.app', 'X-Title': 'OncoCorr' },
+        );
+        break;
+      case 'ollama': {
+        const base = (import.meta.env.VITE_OLLAMA_URL as string | undefined) || 'http://localhost:11434';
+        const model = (import.meta.env.VITE_OLLAMA_MODEL as string | undefined) || 'llama3.2';
+        const res = await fetch(`${base}/api/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, prompt: TEST_PROMPT, stream: false }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        break;
+      }
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: humaniseError(e) };
+  }
+}
+
+function humaniseError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.toLowerCase().includes('failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')) {
+    return 'Network / CORS error — check your connection or whether the API allows browser requests';
+  }
+  return msg;
+}
+
 export async function askAI(prompt: string): Promise<AIResponse> {
   const env = import.meta.env;
   const selected = getSelectedProvider();
+  const failures: Array<{ name: string; error: string }> = [];
 
   // Helper: try a specific provider and return its result (throws on failure)
   async function tryProvider(provider: AIProvider): Promise<AIResponse | null> {
@@ -224,29 +306,46 @@ export async function askAI(prompt: string): Promise<AIResponse> {
     return null;
   }
 
+  async function tryWithTracking(provider: AIProvider): Promise<AIResponse | null> {
+    try {
+      return await tryProvider(provider);
+    } catch (e) {
+      // Only record failures for providers that actually had a key and were called
+      const hadKey =
+        provider === 'ollama' ||
+        (provider === 'groq'       && !!(getApiKey('groq')       || env.VITE_GROQ_API_KEY))       ||
+        (provider === 'deepseek'   && !!(getApiKey('deepseek')   || env.VITE_DEEPSEEK_API_KEY))   ||
+        (provider === 'gemini'     && !!(getApiKey('gemini')     || env.VITE_GEMINI_API_KEY))     ||
+        (provider === 'openrouter' && !!(getApiKey('openrouter') || env.VITE_OPENROUTER_API_KEY));
+      if (hadKey) failures.push({ name: provider, error: humaniseError(e) });
+      console.warn(`${provider} failed:`, e);
+      return null;
+    }
+  }
+
   // If the user has explicitly chosen a provider, try it first
   if (selected !== 'auto') {
-    try {
-      const result = await tryProvider(selected as AIProvider);
-      if (result) return result;
-    } catch (e) {
-      console.warn(`Selected provider (${selected}) failed:`, e);
-    }
+    const result = await tryWithTracking(selected as AIProvider);
+    if (result) return result;
   }
 
   // Auto-priority fallback
   const order: AIProvider[] = ['groq', 'deepseek', 'gemini', 'openrouter', 'ollama'];
   for (const provider of order) {
     if (selected !== 'auto' && provider === (selected as AIProvider)) continue; // already tried
-    try {
-      const result = await tryProvider(provider);
-      if (result) return result;
-    } catch (e) {
-      console.warn(`${provider} failed:`, e);
-    }
+    const result = await tryWithTracking(provider);
+    if (result) return result;
   }
 
-  return { text: getDemoResponse(prompt), provider: 'demo' };
+  // All providers exhausted — build an informative fallback response
+  const errorSection = failures.length > 0
+    ? `**⚠️ Configured provider(s) failed — showing demo response**\n\n` +
+      `The following provider(s) returned an error:\n` +
+      failures.map(({ name, error }) => `- **${name}**: \`${error}\``).join('\n') +
+      `\n\nPlease check your API keys in ⚙ Settings, or open the browser console (F12) for full details.\n\n---\n\n`
+    : '';
+
+  return { text: errorSection + getDemoResponse(prompt), provider: 'demo' };
 }
 
 export function activeProvider(): AIProvider {

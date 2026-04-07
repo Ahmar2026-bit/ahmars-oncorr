@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Key, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { X, Key, ExternalLink, CheckCircle2, Loader2 } from 'lucide-react';
 import { getStoredApiKeys, saveApiKeys, getSelectedProvider, saveSelectedProvider, type ApiKeys } from '../services/settingsService';
+import { testProvider, type ProviderTestResult } from '../services/aiService';
 
 interface Props {
   onClose: () => void;
@@ -53,6 +54,8 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
   const [keys, setKeys] = useState<ApiKeys>({ groq: '', deepseek: '', gemini: '', openrouter: '' });
   const [selectedProvider, setSelectedProvider] = useState<string>('auto');
   const [saved, setSaved] = useState(false);
+  const [testing, setTesting] = useState<Record<string, boolean>>({});
+  const [testResults, setTestResults] = useState<Record<string, ProviderTestResult>>({});
 
   useEffect(() => {
     setKeys(getStoredApiKeys());
@@ -71,6 +74,16 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
       onSaved();
       onClose();
     }, 800);
+  }
+
+  async function handleTest(providerId: keyof ApiKeys) {
+    const key = keys[providerId].trim();
+    if (!key) return;
+    setTesting((prev) => ({ ...prev, [providerId]: true }));
+    setTestResults((prev) => { const { [providerId]: _, ...rest } = prev; return rest; });
+    const result = await testProvider(providerId, key);
+    setTesting((prev) => ({ ...prev, [providerId]: false }));
+    setTestResults((prev) => ({ ...prev, [providerId]: result }));
   }
 
   return (
@@ -110,15 +123,36 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
                   {p.helpLabel} <ExternalLink size={10} />
                 </a>
               </div>
-              <input
-                type="password"
-                autoComplete="off"
-                placeholder={p.placeholder}
-                value={keys[p.id]}
-                onChange={(e) => setKeys((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent font-mono"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  autoComplete="off"
+                  placeholder={p.placeholder}
+                  value={keys[p.id]}
+                  onChange={(e) => {
+                    setKeys((prev) => ({ ...prev, [p.id]: e.target.value }));
+                    setTestResults((prev) => { const { [p.id]: _, ...rest } = prev; return rest; });
+                  }}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleTest(p.id)}
+                  disabled={!keys[p.id].trim() || testing[p.id]}
+                  className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                  title="Test this API key"
+                >
+                  {testing[p.id] ? <Loader2 size={12} className="animate-spin" /> : 'Test'}
+                </button>
+              </div>
               <p className="text-xs text-gray-400 mt-0.5">{p.note}</p>
+              {testResults[p.id] && (
+                <p className={`text-xs mt-0.5 ${testResults[p.id].ok ? 'text-green-600' : 'text-red-600'}`}>
+                  {testResults[p.id].ok
+                    ? '✓ Connected successfully!'
+                    : `✗ ${testResults[p.id].error}`}
+                </p>
+              )}
             </div>
           ))}
 
