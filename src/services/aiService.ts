@@ -198,25 +198,36 @@ async function queryOllama(prompt: string): Promise<string> {
 export async function askAI(prompt: string): Promise<AIResponse> {
   const env = import.meta.env;
   const selected = getSelectedProvider();
+  // Track whether at least one provider with a configured key was attempted.
+  // Used to distinguish "no key set → show demo" from "key set but call failed → show error".
+  let anyProviderAttempted = false;
 
   // Helper: try a specific provider and return its result (throws on failure)
   async function tryProvider(provider: AIProvider): Promise<AIResponse | null> {
     switch (provider) {
       case 'groq':
-        if (getApiKey('groq') || env.VITE_GROQ_API_KEY)
+        if (getApiKey('groq') || env.VITE_GROQ_API_KEY) {
+          anyProviderAttempted = true;
           return { text: await queryGroq(prompt), provider: 'groq', model: 'llama-3.3-70b' };
+        }
         break;
       case 'deepseek':
-        if (getApiKey('deepseek') || env.VITE_DEEPSEEK_API_KEY)
+        if (getApiKey('deepseek') || env.VITE_DEEPSEEK_API_KEY) {
+          anyProviderAttempted = true;
           return { text: await queryDeepSeek(prompt), provider: 'deepseek', model: 'deepseek-chat' };
+        }
         break;
       case 'gemini':
-        if (getApiKey('gemini') || env.VITE_GEMINI_API_KEY)
+        if (getApiKey('gemini') || env.VITE_GEMINI_API_KEY) {
+          anyProviderAttempted = true;
           return { text: await queryGemini(prompt), provider: 'gemini', model: 'gemini-1.5-flash' };
+        }
         break;
       case 'openrouter':
-        if (getApiKey('openrouter') || env.VITE_OPENROUTER_API_KEY)
+        if (getApiKey('openrouter') || env.VITE_OPENROUTER_API_KEY) {
+          anyProviderAttempted = true;
           return { text: await queryOpenRouter(prompt), provider: 'openrouter', model: 'llama-3.1-8b:free' };
+        }
         break;
       case 'ollama':
         return { text: await queryOllama(prompt), provider: 'ollama' };
@@ -244,6 +255,15 @@ export async function askAI(prompt: string): Promise<AIResponse> {
     } catch (e) {
       console.warn(`${provider} failed:`, e);
     }
+  }
+
+  // If a key was configured but every call failed, return a clear error rather than the
+  // misleading "no API key configured" demo text.
+  if (anyProviderAttempted) {
+    return {
+      text: '⚠️ **Request failed.**\n\nYour API key is saved, but the request could not be completed. The key may be invalid, rate-limited, or the network may be unreachable.\n\nPlease verify your key in ⚙ **Settings** and try again.',
+      provider: 'demo',
+    };
   }
 
   return { text: getDemoResponse(prompt), provider: 'demo' };
