@@ -199,6 +199,11 @@ export async function askAI(prompt: string): Promise<AIResponse> {
   const env = import.meta.env;
   const selected = getSelectedProvider();
 
+  // Collect errors from providers that were actually attempted (i.e. had a key).
+  // This lets us surface a meaningful error instead of silently falling back to
+  // demo mode when the user has configured a key but all calls fail.
+  const providerErrors: { provider: string; message: string }[] = [];
+
   // Helper: try a specific provider and return its result (throws on failure)
   async function tryProvider(provider: AIProvider): Promise<AIResponse | null> {
     switch (provider) {
@@ -230,6 +235,8 @@ export async function askAI(prompt: string): Promise<AIResponse> {
       const result = await tryProvider(selected as AIProvider);
       if (result) return result;
     } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      providerErrors.push({ provider: selected, message });
       console.warn(`Selected provider (${selected}) failed:`, e);
     }
   }
@@ -242,8 +249,21 @@ export async function askAI(prompt: string): Promise<AIResponse> {
       const result = await tryProvider(provider);
       if (result) return result;
     } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      providerErrors.push({ provider, message });
       console.warn(`${provider} failed:`, e);
     }
+  }
+
+  // If any key-based providers were tried but failed, throw so the caller can
+  // show the user what actually went wrong instead of silently using demo mode.
+  const KEY_BASED_PROVIDERS: AIProvider[] = ['groq', 'deepseek', 'gemini', 'openrouter'];
+  const keyedErrors = providerErrors.filter((p) =>
+    KEY_BASED_PROVIDERS.includes(p.provider as AIProvider),
+  );
+  if (keyedErrors.length > 0) {
+    const detail = keyedErrors.map((e) => `${e.provider}: ${e.message}`).join(' | ');
+    throw new Error(`All configured providers failed — ${detail}`);
   }
 
   return { text: getDemoResponse(prompt), provider: 'demo' };
