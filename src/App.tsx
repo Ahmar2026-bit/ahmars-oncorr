@@ -20,6 +20,7 @@ import TranscriptionalRegulation from './components/TranscriptionalRegulation';
 import TumorBoard from './components/TumorBoard';
 import InvestigatorRegistry from './components/InvestigatorRegistry';
 import OmicsRegistry from './components/OmicsRegistry';
+import SpatialCommunication from './components/SpatialCommunication';
 import { DEFAULT_CANCER_ID } from './data/cancerTypes';
 
 type Tab =
@@ -42,7 +43,8 @@ type Tab =
   | 'trials'
   | 'tumorboard'
   | 'investigators'
-  | 'omics';
+  | 'omics'
+  | 'spatial';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('correlation');
@@ -69,6 +71,7 @@ export default function App() {
     { id: 'literature',     label: '📚 PubMed' },
     { id: 'investigators',  label: '🔭 Investigators' },
     { id: 'omics',          label: '🧫 Omics Registry' },
+    { id: 'spatial',        label: '🔬 Spatial Comms' },
     { id: 'geo',            label: '🗄️ GEO Datasets' },
     { id: 'network',        label: '🔗 Protein Network' },
     { id: 'proteomics',     label: '🔭 Proteomics' },
@@ -218,6 +221,9 @@ export default function App() {
           )}
           {activeTab === 'omics' && (
             <OmicsRegistry geneA={geneA} geneB={geneB} cancerType={cancerType} />
+          )}
+          {activeTab === 'spatial' && (
+            <SpatialCommunication geneA={geneA} geneB={geneB} cancerType={cancerType} />
           )}
         </div>
 
