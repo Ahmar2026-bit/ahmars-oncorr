@@ -139,7 +139,8 @@ function generateMockCells(geneA: string, geneB: string, cancerType: string): Sp
     const radius = rng() * cluster.r;
     const x = Math.max(0, Math.min(900, cluster.cx + radius * Math.cos(angle) + (rng() - 0.5) * 20));
     const y = Math.max(0, Math.min(900, cluster.cy + radius * Math.sin(angle) + (rng() - 0.5) * 20));
-    const typeIdx = rng() < 0.70 ? cluster.dominantType : Math.floor(rng() * CELL_TYPES.length);
+    const roll = rng();
+    const typeIdx = roll < 0.70 ? cluster.dominantType : Math.floor(rng() * CELL_TYPES.length);
     const cellType = CELL_TYPES[typeIdx] ?? 'Epithelial';
     const geneAExpr = Math.max(0, Math.min(10, (GENE_A_BIAS[cellType] ?? 5) + (rng() - 0.5) * 4));
     const geneBExpr = Math.max(0, Math.min(10, (GENE_B_BIAS[cellType] ?? 5) + (rng() - 0.5) * 4));
@@ -217,7 +218,7 @@ function computeZScores(
   const typeCounts = new Array<number>(n).fill(0);
 
   cells.forEach(cell => {
-    const i = typeIdx.get(cell.cellType)!;
+    const i = typeIdx.get(cell.cellType) ?? 0;
     typeCounts[i]++;
     if (cell.geneAExpr > threshA) pA[i]++;
     if (cell.geneBExpr > threshB) pB[i]++;
@@ -231,11 +232,11 @@ function computeZScores(
   const observedCounts: number[][] = Array.from({ length: n }, () => new Array<number>(n).fill(0));
 
   cells.forEach((cell, idx) => {
-    const ci = typeIdx.get(cell.cellType)!;
+    const ci = typeIdx.get(cell.cellType) ?? 0;
     const neighbors = adjList.get(idx) ?? [];
     neighbors.forEach(nIdx => {
       const neighbor = cells[nIdx];
-      const cj = typeIdx.get(neighbor.cellType)!;
+      const cj = typeIdx.get(neighbor.cellType) ?? 0;
       edgeCounts[ci][cj]++;
       if (cell.geneAExpr > threshA && neighbor.geneBExpr > threshB) {
         observedCounts[ci][cj]++;
@@ -689,15 +690,18 @@ export default function SpatialCommunication({ geneA, geneB, cancerType }: Spati
     const spatial = parseSpatialCSV(uploadedSpatialText);
     const exprMap = parseExprCSV(uploadedExprText);
     const merged: SpatialCell[] = spatial
-      .filter(p => p.id !== undefined && exprMap.has(p.id!))
-      .map(p => ({
-        id: p.id!,
-        x: p.x!,
-        y: p.y!,
-        cellType: p.cellType!,
-        geneAExpr: exprMap.get(p.id!)!.geneAExpr,
-        geneBExpr: exprMap.get(p.id!)!.geneBExpr,
-      }));
+      .filter(p => p.id !== undefined && p.x !== undefined && p.y !== undefined && p.cellType && exprMap.has(p.id!))
+      .map(p => {
+        const expr = exprMap.get(p.id!)!;
+        return {
+          id: p.id as number,
+          x: p.x as number,
+          y: p.y as number,
+          cellType: p.cellType as string,
+          geneAExpr: expr.geneAExpr,
+          geneBExpr: expr.geneBExpr,
+        };
+      });
     return merged.length > 0 ? merged : mockCells;
   }, [uploadedSpatialText, uploadedExprText, mockCells]);
 
