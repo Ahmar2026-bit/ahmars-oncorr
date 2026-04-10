@@ -171,7 +171,15 @@ function computePercentile(values: number[], p: number): number {
   return sorted[Math.min(idx, sorted.length - 1)] ?? 0;
 }
 
-/** Abramowitz & Stegun normal CDF approximation */
+// Null-model tuning constants (CellWHISPER analytical framework)
+/** Extra overlap factor for same cell-type pairs under non-iid (gap-junction) model */
+const OVERLAP_SAME_TYPE = 0.2;
+/** Extra overlap factor for different cell-type pairs under non-iid model */
+const OVERLAP_DIFF_TYPE = 0.05;
+/** Variance inflation multiplier for non-iid model */
+const NON_IID_VARIANCE_INFLATION = 1.2;
+/** Minimum variance guard to avoid division by zero */
+const MIN_VARIANCE = 1e-10;
 function normalCDF(z: number): number {
   const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
   const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
@@ -243,13 +251,13 @@ function computeZScores(
       const edges = edgeCounts[i][j];
       if (edges === 0) continue;
       // Non-iid accounts for spatial clustering of same-type cells
-      const overlapFactor = i === j ? 0.2 : 0.05;
+      const overlapFactor = i === j ? OVERLAP_SAME_TYPE : OVERLAP_DIFF_TYPE;
       const mean = mode === 'iid'
         ? edges * pA[i] * pB[j]
         : edges * pA[i] * pB[j] * (1 + overlapFactor);
       const variance = mode === 'iid'
-        ? Math.max(mean * (1 - pA[i] * pB[j]), 1e-10)
-        : Math.max(mean * 1.2, 1e-10);
+        ? Math.max(mean * (1 - pA[i] * pB[j]), MIN_VARIANCE)
+        : Math.max(mean * NON_IID_VARIANCE_INFLATION, MIN_VARIANCE);
       const z = (observedCounts[i][j] - mean) / Math.sqrt(variance);
       zScores[i][j] = z;
       pValues[i][j] = pValueFromZ(z);
@@ -285,7 +293,7 @@ function parseSpatialCSV(text: string): Partial<SpatialCell>[] {
       y: parseFloat(get('y')) || 0,
       cellType: get('cell_type') || 'Unknown',
     };
-  }).filter(c => !isNaN(c.x!) && !isNaN(c.y!));
+  }).filter(c => c.x !== undefined && c.y !== undefined && !isNaN(c.x) && !isNaN(c.y));
 }
 
 function parseExprCSV(text: string): Map<number, { geneAExpr: number; geneBExpr: number }> {
@@ -713,7 +721,7 @@ export default function SpatialCommunication({ geneA, geneB, cancerType }: Spati
         const threshB = computePercentile(activeCells.map(c => c.geneBExpr), thresholdPercentile);
         setProgress(75);
 
-        // Stage 3 – finalise
+        // Stage 3 – finalize
         setTimeout(() => {
           const result = computeZScores(activeCells, adj, threshA, threshB, analysisMode);
           setWhisperResult(result);
